@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # Database service
+  db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${DB_PASSWORD:-YourStrongPassword123}
+      - MSSQL_PID=Express
+    volumes:
+      - mssql-data:/var/opt/mssql
+    ports:
+      - "1433:1433"
+    networks:
+      - app-network
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${DB_PASSWORD:-YourStrongPassword123}" -Q "SELECT 1" -b -o /dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API service
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - DB_CONNECTION_STRING=${DB_CONNECTION_STRING}
+      - JWT_SECRET=${JWT_SECRET:-your_random_secret_key_here}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000}
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Frontend service
+  web:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mssql-data:
