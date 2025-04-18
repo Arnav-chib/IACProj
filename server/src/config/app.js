@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const dotenv = require('dotenv');
 const authRoutes = require('../routes/authRoutes');
 const formRoutes = require('../routes/formRoutes');
+const tokenRoutes = require('../routes/tokenRoutes');
+const embedRoutes = require('../routes/embedRoutes');
 
 dotenv.config();
 
@@ -33,12 +35,14 @@ app.use(cors({
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Token']
 }));
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/forms', formRoutes);
+app.use('/api/tokens', tokenRoutes);
+app.use('/api/embed', embedRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
