@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
 const authRoutes = require('../routes/authRoutes');
+const formRoutes = require('../routes/formRoutes');
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use(cors({
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/forms', formRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
