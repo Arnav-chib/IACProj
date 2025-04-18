@@ -1,14 +1,15 @@
 # Build stage
-FROM node:18-alpine as build
+FROM node:18-alpine AS builder
 
-# Create app directory
 WORKDIR /app
 
-# Install app dependencies
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm ci
 
-# Bundle app source
+# Copy source code
 COPY . .
 
 # Build the app
@@ -17,10 +18,10 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
-# Copy the build output
-COPY --from=build /app/build /usr/share/nginx/html
+# Copy built files from builder
+COPY --from=builder /app/build /usr/share/nginx/html
 
-# Copy custom nginx configuration
+# Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port

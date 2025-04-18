@@ -1,17 +1,39 @@
-FROM node:18-alpine
+# Build stage
+FROM node:18-alpine AS builder
 
-# Create app directory
 WORKDIR /app
 
-# Install app dependencies
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
 RUN npm ci --only=production
 
-# Bundle app source
-COPY . .
+# Copy built files from builder
+COPY --from=builder /app/dist ./dist
+
+# Set environment variables
+ENV NODE_ENV=production
 
 # Expose port
 EXPOSE 3000
 
-# Run the application
-CMD ["node", "src/server.js"]
+# Start the server
+CMD ["npm", "start"]
