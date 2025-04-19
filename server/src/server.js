@@ -1,11 +1,56 @@
-const app = require('./config/app');
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
 const { initializeMasterDbPool } = require('./config/database');
 const { initializeMasterDb } = require('./utils/dbUtils');
 const { setPool } = require('./models/userModel');
-const dotenv = require('dotenv');
+const { setPool: setOrgPool } = require('./models/orgModel');
+const { scheduleTokenCleanup } = require('./services/tokenService');
+const routes = require('./routes');
 const logger = require('./utils/logger');
+const { setupGracefulShutdown } = require('./utils/serverUtils');
+const { errorHandler, AppError, ErrorTypes } = require('./middleware/errorHandler');
 
-dotenv.config();
+const app = express();
+
+// Middleware
+app.use(cors({ origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*' }));
+app.use(express.json());
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+
+// Routes
+app.use('/api', routes);
+
+// Health check
+app.get('/health', async (req, res) => {
+  try {
+    // Check database connectivity
+    const masterPool = await initializeMasterDbPool();
+    await masterPool.request().query('SELECT 1 as dbConnectivity');
+    
+    res.status(200).json({
+      status: 'UP',
+      database: 'Connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Health check failed:', { error: error.message });
+    res.status(500).json({
+      status: 'DOWN',
+      database: 'Disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// 404 handler for unmatched routes
+app.use((req, res, next) => {
+  next(new AppError(`Route not found: ${req.originalUrl}`, 404, ErrorTypes.NOT_FOUND.code));
+});
+
+// Error handler
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
@@ -18,8 +63,14 @@ async function startServer() {
     // Set pool for user model
     setPool(masterPool);
     
+    // Set pool for organization model
+    setOrgPool(masterPool);
+    
     // Initialize master database schema
     await initializeMasterDb(masterPool);
+    
+    // Schedule cleanup of expired API tokens
+    scheduleTokenCleanup(masterPool);
     
     // Start the server
     const server = app.listen(PORT, () => {
@@ -38,72 +89,5 @@ async function startServer() {
   }
 }
 
-// Setup graceful shutdown
-function setupGracefulShutdown(server, pool) {
-  // Handle SIGTERM signal
-  process.on('SIGTERM', () => {
-    logger.info('SIGTERM received. Shutting down gracefully...');
-    shutdown(server, pool);
-  });
-  
-  // Handle SIGINT signal (Ctrl+C)
-  process.on('SIGINT', () => {
-    logger.info('SIGINT received. Shutting down gracefully...');
-    shutdown(server, pool);
-  });
-  
-  // Handle uncaught exceptions
-  process.on('uncaughtException', (err) => {
-    logger.error('Uncaught exception:', { 
-      error: err.message,
-      stack: err.stack
-    });
-    shutdown(server, pool);
-  });
-  
-  // Handle unhandled promise rejections
-  process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled promise rejection:', { 
-      reason: reason.message || reason,
-      stack: reason.stack
-    });
-    shutdown(server, pool);
-  });
-}
-
-// Graceful shutdown function
-async function shutdown(server, pool) {
-  // Set a timeout to force exit if graceful shutdown takes too long
-  const forceExit = setTimeout(() => {
-    logger.error('Could not close connections in time, forcefully shutting down');
-    process.exit(1);
-  }, 10000);
-  
-  try {
-    // Stop accepting new connections
-    server.close(() => {
-      logger.info('HTTP server closed');
-    });
-    
-    // Close database connections
-    if (pool) {
-      await pool.close();
-      logger.info('Database connections closed');
-    }
-    
-    // Clear the force exit timeout
-    clearTimeout(forceExit);
-    
-    // Exit the process
-    logger.info('Graceful shutdown completed');
-    process.exit(0);
-  } catch (err) {
-    logger.error('Error during shutdown:', { 
-      error: err.message,
-      stack: err.stack
-    });
-    process.exit(1);
-  }
-}
-
+// Start server
 startServer();

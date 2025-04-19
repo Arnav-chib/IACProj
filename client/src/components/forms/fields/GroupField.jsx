@@ -1,147 +1,140 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import TextInput from './TextInput';
 import Dropdown from './Dropdown';
+import FileInput from './FileInput';
 import Button from '../../common/Button';
 
-const GroupField = ({ 
-  id, 
-  label, 
-  columns, 
-  columnConfig, 
-  rows = 1, 
-  canAddRows = false, 
-  value = [], 
-  onChange, 
-  error = null 
-}) => {
-  // Initialize with default rows if value is empty
-  const [groupRows, setGroupRows] = useState(() => {
-    if (value.length > 0) return value;
-    
-    // Initialize with empty rows
-    const initialRows = [];
-    for (let i = 0; i < rows; i++) {
-      const rowData = {};
-      columnConfig.forEach(col => {
-        rowData[col.key] = '';
-      });
-      initialRows.push(rowData);
+const GroupField = ({ id, label, value, onChange, columnConfig, rows, canAddRows, error, formValues }) => {
+  // Initialize rows data
+  const [rowsData, setRowsData] = useState(() => {
+    try {
+      if (value && typeof value === 'string') {
+        return JSON.parse(value);
+      }
+    } catch (e) {
+      console.error('Error parsing group value:', e);
     }
-    return initialRows;
+    
+    // Default rows structure
+    return Array(rows).fill().map(() => {
+      const rowData = {};
+      columnConfig.columns.forEach(col => {
+        rowData[col.id] = '';
+      });
+      return rowData;
+    });
   });
 
-  // Update a cell value
-  const updateCell = (rowIndex, columnKey, cellValue) => {
-    const updatedRows = [...groupRows];
+  // Update parent component whenever rows data changes
+  useEffect(() => {
+    onChange(JSON.stringify(rowsData));
+  }, [rowsData, onChange]);
+
+  // Handle field changes within a row
+  const handleFieldChange = (rowIndex, columnId, fieldValue) => {
+    const updatedRows = [...rowsData];
     updatedRows[rowIndex] = {
       ...updatedRows[rowIndex],
-      [columnKey]: cellValue
+      [columnId]: fieldValue
     };
-    setGroupRows(updatedRows);
-    onChange(updatedRows);
+    setRowsData(updatedRows);
   };
 
   // Add a new row
   const addRow = () => {
     const newRow = {};
-    columnConfig.forEach(col => {
-      newRow[col.key] = '';
+    columnConfig.columns.forEach(col => {
+      newRow[col.id] = '';
     });
-    const updatedRows = [...groupRows, newRow];
-    setGroupRows(updatedRows);
-    onChange(updatedRows);
+    setRowsData([...rowsData, newRow]);
   };
 
   // Remove a row
   const removeRow = (rowIndex) => {
-    const updatedRows = groupRows.filter((_, index) => index !== rowIndex);
-    setGroupRows(updatedRows);
-    onChange(updatedRows);
+    const updatedRows = rowsData.filter((_, idx) => idx !== rowIndex);
+    setRowsData(updatedRows);
   };
 
-  // Render a cell based on column type
-  const renderCell = (row, rowIndex, column) => {
-    const key = `${id}-${rowIndex}-${column.key}`;
-    const cellValue = row[column.key] || '';
+  // Render a field based on its type
+  const renderField = (rowIndex, column) => {
+    const fieldId = `${id}-${rowIndex}-${column.id}`;
+    const fieldValue = rowsData[rowIndex][column.id] || '';
     
-    switch (column.type) {
-      case 'text':
-        return (
-          <TextInput
-            id={key}
-            value={cellValue}
-            onChange={(value) => updateCell(rowIndex, column.key, value)}
-            placeholder={column.placeholder || ''}
-          />
-        );
+    // Get field type from column config or default to text
+    const fieldType = column.type || 'text';
+    
+    const commonProps = {
+      id: fieldId,
+      label: '', // No label for individual fields in group
+      value: fieldValue,
+      onChange: (value) => handleFieldChange(rowIndex, column.id, value),
+      required: false // Handle group-level validation separately
+    };
+    
+    switch (fieldType) {
       case 'dropdown':
         return (
           <Dropdown
-            id={key}
+            {...commonProps}
             options={column.options || []}
-            value={cellValue}
-            onChange={(value) => updateCell(rowIndex, column.key, value)}
-            placeholder={column.placeholder || 'Select...'}
+            multiple={column.multiple || false}
           />
         );
+      
+      case 'file':
+        return <FileInput {...commonProps} />;
+      
       default:
-        return (
-          <TextInput
-            id={key}
-            value={cellValue}
-            onChange={(value) => updateCell(rowIndex, column.key, value)}
-            placeholder={column.placeholder || ''}
-          />
-        );
+        return <TextInput {...commonProps} />;
     }
   };
 
   return (
     <div className="mb-6">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
+      <label className="block text-gray-700 text-sm font-bold mb-2">
         {label}
       </label>
       
-      <div className="border border-gray-300 rounded-md overflow-hidden">
-        {/* Table Header */}
-        <div className="grid grid-cols-12 bg-gray-50 border-b border-gray-300">
-          {columnConfig.map((column) => (
-            <div
-              key={`header-${column.key}`}
-              className={`col-span-${12 / columns} px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}
+      {/* Group table */}
+      <div className="border rounded-lg overflow-hidden">
+        {/* Table header */}
+        <div className="bg-gray-100 flex">
+          {columnConfig.columns.map(column => (
+            <div 
+              key={column.id} 
+              className="flex-1 p-2 font-medium text-gray-700 text-sm"
             >
               {column.label}
             </div>
           ))}
-          {/* Empty column for action buttons */}
-          {canAddRows && (
-            <div className="col-span-1 px-4 py-2"></div>
+          {/* Actions column header */}
+          {canAddRows && rowsData.length > 1 && (
+            <div className="w-16 p-2"></div>
           )}
         </div>
         
-        {/* Table Body */}
-        {groupRows.map((row, rowIndex) => (
-          <div 
-            key={`row-${rowIndex}`} 
-            className={`grid grid-cols-12 ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-          >
-            {columnConfig.map((column) => (
-              <div
-                key={`cell-${rowIndex}-${column.key}`}
-                className={`col-span-${12 / columns} px-4 py-2`}
-              >
-                {renderCell(row, rowIndex, column)}
+        {/* Table rows */}
+        {rowsData.map((row, rowIndex) => (
+          <div key={rowIndex} className="flex border-t">
+            {columnConfig.columns.map(column => (
+              <div key={column.id} className="flex-1 p-2">
+                {renderField(rowIndex, column)}
               </div>
             ))}
-            {/* Remove row button */}
-            {canAddRows && groupRows.length > 1 && (
-              <div className="col-span-1 px-4 py-2 flex items-center">
+            
+            {/* Actions column */}
+            {canAddRows && rowsData.length > 1 && (
+              <div className="w-16 p-2 flex items-center">
                 <button
                   type="button"
                   onClick={() => removeRow(rowIndex)}
-                  className="text-red-600 hover:text-red-900"
+                  className="text-red-500 hover:text-red-700"
+                  aria-label="Remove row"
                 >
-                  Remove
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
                 </button>
               </div>
             )}
@@ -149,24 +142,50 @@ const GroupField = ({
         ))}
       </div>
       
-      {/* Add Row Button */}
+      {/* Add row button */}
       {canAddRows && (
         <div className="mt-2">
           <Button
             type="button"
-            variant="secondary"
             onClick={addRow}
+            className="text-sm bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded"
           >
             Add Row
           </Button>
         </div>
       )}
       
-      {error && (
-        <p className="mt-1 text-sm text-red-500">{error}</p>
-      )}
+      {error && <p className="text-red-500 text-xs italic mt-1">{error}</p>}
     </div>
   );
+};
+
+GroupField.propTypes = {
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  label: PropTypes.string.isRequired,
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  columnConfig: PropTypes.shape({
+    columns: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.string.isRequired,
+        label: PropTypes.string.isRequired,
+        type: PropTypes.string
+      })
+    ).isRequired
+  }).isRequired,
+  rows: PropTypes.number,
+  canAddRows: PropTypes.bool,
+  error: PropTypes.string,
+  formValues: PropTypes.object
+};
+
+GroupField.defaultProps = {
+  value: '',
+  rows: 1,
+  canAddRows: false,
+  error: null,
+  formValues: {}
 };
 
 export default GroupField;

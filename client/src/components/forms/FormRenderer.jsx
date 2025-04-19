@@ -4,11 +4,17 @@ import { getForm, submitResponse } from '../../services/formService';
 import TextInput from './fields/TextInput';
 import Dropdown from './fields/Dropdown';
 import GroupField from './fields/GroupField';
+import DateInput from './fields/DateInput';
+import CheckboxInput from './fields/CheckboxInput';
+import SliderInput from './fields/SliderInput';
+import RichTextInput from './fields/RichTextInput';
+import FileInput from './fields/FileInput';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
 
 const FormRenderer = () => {
   const { formId } = useParams();
+  // navigate is used for redirection after form submission in a future implementation
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [formValues, setFormValues] = useState({});
@@ -63,10 +69,57 @@ const FormRenderer = () => {
       if (field.required && !formValues[field.id]) {
         newErrors[field.id] = `${field.name} is required`;
       }
+      
+      // Apply custom validation if needed
+      if (field.validation) {
+        // For date field validations
+        if (field.type === 'date' && field.validation.dependsOn) {
+          const dependentField = field.validation.dependsOn;
+          const dependentValue = formValues[dependentField];
+          
+          if (field.validation.minDate === 'fieldValue' && dependentValue && formValues[field.id]) {
+            const currentDate = new Date(formValues[field.id]);
+            const compareDate = new Date(dependentValue);
+            
+            if (currentDate < compareDate) {
+              const dependentFieldName = form.fields.find(f => f.id === dependentField)?.name || 'another field';
+              newErrors[field.id] = `${field.name} must be after ${dependentFieldName}`;
+            }
+          }
+        }
+      }
     });
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+  
+  const preprocessFormData = () => {
+    const processedValues = { ...formValues };
+    
+    // Process file uploads if any
+    const fileFieldIds = form.fields
+      .filter(field => field.type === 'file')
+      .map(field => field.id);
+    
+    // For now, just log that file uploads would be handled here
+    // In a real implementation, you would upload the files and save the URLs
+    fileFieldIds.forEach(fieldId => {
+      const fileData = formValues[fieldId];
+      if (fileData && fileData.file) {
+        console.log(`File to upload: ${fileData.name}`);
+        // Replace file object with just metadata for now
+        processedValues[fieldId] = {
+          name: fileData.name,
+          type: fileData.type,
+          size: fileData.size,
+          // In a real implementation, this would be the uploaded file URL
+          url: URL.createObjectURL(fileData.file)
+        };
+      }
+    });
+    
+    return processedValues;
   };
   
   const handleSubmit = async (e) => {
@@ -78,9 +131,13 @@ const FormRenderer = () => {
     
     try {
       setSubmitting(true);
+      
+      // Preprocess form data (e.g., handle file uploads)
+      const processedValues = preprocessFormData();
+      
       await submitResponse(formId, {
         respondentInfo: {},
-        values: formValues
+        values: processedValues
       });
       setSubmitted(true);
     } catch (error) {
@@ -98,24 +155,84 @@ const FormRenderer = () => {
       value: formValues[field.id] || '',
       onChange: (value) => handleFieldChange(field.id, value),
       required: field.required,
-      error: errors[field.id]
+      error: errors[field.id],
+      formValues // Pass all form values for interdependent validation
     };
     
     switch (field.type) {
       case 'text':
         return <TextInput key={field.id} {...commonProps} />;
+      
+      case 'date':
+        return (
+          <DateInput
+            key={field.id}
+            {...commonProps}
+            validation={field.validation}
+          />
+        );
+      
+      case 'checkbox':
+        return <CheckboxInput key={field.id} {...commonProps} />;
+      
       case 'dropdown':
+        let options = [];
+        let isMultiple = false;
+        
+        if (field.population) {
+          if (field.population.options) {
+            if (Array.isArray(field.population.options)) {
+              options = field.population.options.map(option => ({
+                value: option.value || option,
+                label: option.label || option
+              }));
+            } else if (field.population.dependsOn && field.population.options) {
+              // Handle dynamic options based on another field
+              const dependentFieldId = field.population.dependsOn;
+              const dependentValue = formValues[dependentFieldId];
+              
+              if (dependentValue && field.population.options[dependentValue]) {
+                options = field.population.options[dependentValue].map(option => ({
+                  value: option.value || option,
+                  label: option.label || option
+                }));
+              }
+            }
+          }
+          
+          isMultiple = field.population.multiple === true;
+        }
+        
         return (
           <Dropdown
             key={field.id}
             {...commonProps}
-            options={(field.population?.options || []).map(option => ({
-              value: option.value || option,
-              label: option.label || option
-            }))}
-            multiple={field.population?.multiple}
+            options={options}
+            multiple={isMultiple}
           />
         );
+      
+      case 'slider':
+        return (
+          <SliderInput
+            key={field.id}
+            {...commonProps}
+            config={field.population}
+          />
+        );
+      
+      case 'richtext':
+        return (
+          <RichTextInput
+            key={field.id}
+            {...commonProps}
+            needsApproval={field.needsApproval}
+          />
+        );
+      
+      case 'file':
+        return <FileInput key={field.id} {...commonProps} />;
+      
       case 'group':
         // Find group definition
         const group = form.groups.find(g => g.id === field.groupId);
@@ -131,6 +248,7 @@ const FormRenderer = () => {
             canAddRows={group.canAddRows}
           />
         );
+      
       default:
         return <TextInput key={field.id} {...commonProps} />;
     }

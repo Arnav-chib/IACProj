@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import apiService from '../services/api';
+import { toast } from 'react-toastify';
 
 const AuthContext = createContext();
 
@@ -10,57 +11,63 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // Check if user is logged in on mount
     const token = localStorage.getItem('token');
     if (token) {
-      validateToken(token);
+      validateToken();
     } else {
       setLoading(false);
     }
   }, []);
 
-  const validateToken = async (token) => {
+  const validateToken = async () => {
     try {
-      const response = await axios.get('/api/auth/validate', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setCurrentUser(response.data.user);
+      const response = await apiService.getCurrentUser();
+      setCurrentUser(response.user);
+      setError(null);
     } catch (error) {
+      // Clear token if invalid
       localStorage.removeItem('token');
       setCurrentUser(null);
+      setError('Session expired. Please log in again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (credentials) => {
     try {
-      const response = await axios.post('/api/auth/login', { email, password });
-      const { token, user } = response.data;
+      const response = await apiService.login(credentials);
+      const { token, user } = response;
       localStorage.setItem('token', token);
       setCurrentUser(user);
+      setError(null);
       return { success: true };
     } catch (error) {
+      setError('Login failed. Please check your credentials.');
       return {
         success: false,
-        error: error.response?.data?.message || 'Login failed'
+        error: error.response?.data?.error || 'Login failed'
       };
     }
   };
 
   const register = async (userData) => {
     try {
-      const response = await axios.post('/api/auth/register', userData);
-      const { token, user } = response.data;
+      const response = await apiService.register(userData);
+      const { token, user } = response;
       localStorage.setItem('token', token);
       setCurrentUser(user);
+      setError(null);
       return { success: true };
     } catch (error) {
+      setError('Registration failed. Please check your information.');
       return {
         success: false,
-        error: error.response?.data?.message || 'Registration failed'
+        error: error.response?.data?.error || 'Registration failed'
       };
     }
   };
@@ -68,28 +75,34 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setCurrentUser(null);
+    setError(null);
+    toast.info('You have been logged out');
   };
 
   const forgotPassword = async (email) => {
     try {
-      await axios.post('/api/auth/forgot-password', { email });
+      await apiService.forgotPassword(email);
+      setError(null);
       return { success: true };
     } catch (error) {
+      setError('Password reset request failed.');
       return {
         success: false,
-        error: error.response?.data?.message || 'Password reset request failed'
+        error: error.response?.data?.error || 'Password reset request failed'
       };
     }
   };
 
   const resetPassword = async (token, newPassword) => {
     try {
-      await axios.post('/api/auth/reset-password', { token, newPassword });
+      await apiService.resetPassword(token, newPassword);
+      setError(null);
       return { success: true };
     } catch (error) {
+      setError('Password reset failed.');
       return {
         success: false,
-        error: error.response?.data?.message || 'Password reset failed'
+        error: error.response?.data?.error || 'Password reset failed'
       };
     }
   };
@@ -97,6 +110,7 @@ export const AuthProvider = ({ children }) => {
   const value = {
     currentUser,
     loading,
+    error,
     login,
     register,
     logout,

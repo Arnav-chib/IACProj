@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 const Header = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const isActive = (path) => {
+    return location.pathname === path;
   };
 
   return (
@@ -22,22 +27,55 @@ const Header = () => {
                 FormManager
               </Link>
             </div>
-            {currentUser && (
-              <nav className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                <Link
-                  to="/dashboard"
-                  className="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/dashboard/tokens"
-                  className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                >
-                  API Tokens
-                </Link>
-              </nav>
-            )}
+            <nav className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              {/* Public links */}
+              <Link
+                to="/about"
+                className={`${
+                  isActive('/about')
+                    ? 'border-indigo-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+              >
+                About Us
+              </Link>
+              <Link
+                to="/blog"
+                className={`${
+                  isActive('/blog')
+                    ? 'border-indigo-500 text-gray-900'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+              >
+                Blog
+              </Link>
+              
+              {/* Authenticated user links */}
+              {currentUser && (
+                <>
+                  <Link
+                    to="/dashboard"
+                    className={`${
+                      isActive('/dashboard')
+                        ? 'border-indigo-500 text-gray-900'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    to="/dashboard/tokens"
+                    className={`${
+                      isActive('/dashboard/tokens')
+                        ? 'border-indigo-500 text-gray-900'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                  >
+                    API Tokens
+                  </Link>
+                </>
+              )}
+            </nav>
           </div>
           <div className="hidden sm:ml-6 sm:flex sm:items-center">
             {currentUser ? (
@@ -142,6 +180,22 @@ const Header = () => {
       {menuOpen && (
         <div className="sm:hidden">
           <div className="pt-2 pb-3 space-y-1">
+            {/* Mobile menu links */}
+            <Link
+              to="/about"
+              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+              onClick={() => setMenuOpen(false)}
+            >
+              About Us
+            </Link>
+            <Link
+              to="/blog"
+              className="border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+              onClick={() => setMenuOpen(false)}
+            >
+              Blog
+            </Link>
+            
             {currentUser ? (
               <>
                 <Link

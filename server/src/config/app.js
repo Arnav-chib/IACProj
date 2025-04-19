@@ -6,7 +6,6 @@ const compression = require('compression');
 const xss = require('xss-clean');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
-const mongoSanitize = require('express-mongo-sanitize');
 const { rateLimit } = require('express-rate-limit');
 const authRoutes = require('../routes/authRoutes');
 const formRoutes = require('../routes/formRoutes');
@@ -47,9 +46,6 @@ app.use(xss());
 
 // Prevent parameter pollution
 app.use(hpp());
-
-// Sanitize data
-app.use(mongoSanitize());
 
 // Parse JSON requests
 app.use(express.json({ limit: '10kb' }));

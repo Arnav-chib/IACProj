@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const { generateApiToken, hashApiToken } = require('../utils/securityUtils');
+const logger = require('../utils/logger');
 
 // Generate a new API token for a user
 async function createApiToken(userId, tokenName, permissions, masterPool) {
@@ -124,9 +125,50 @@ async function validateApiToken(token, masterPool) {
   }
 }
 
+// Clean up expired tokens
+async function cleanupExpiredTokens(masterPool) {
+  try {
+    const now = new Date();
+    const result = await masterPool.request()
+      .input('now', sql.DateTime, now)
+      .query(`
+        DELETE FROM API_Tokens
+        WHERE ExpiresAt < @now
+      `);
+    
+    const deletedCount = result.rowsAffected[0];
+    if (deletedCount > 0) {
+      logger.info(`Cleaned up ${deletedCount} expired API tokens`);
+    }
+    
+    return deletedCount;
+  } catch (error) {
+    logger.error('Error cleaning up expired tokens:', { error: error.message });
+  }
+}
+
+// Schedule cleanup to run daily
+function scheduleTokenCleanup(masterPool) {
+  // Run once at startup
+  cleanupExpiredTokens(masterPool).catch(err => 
+    logger.error('Initial token cleanup failed:', { error: err.message })
+  );
+  
+  // Schedule to run daily (86400000 ms = 24 hours)
+  setInterval(() => {
+    cleanupExpiredTokens(masterPool).catch(err => 
+      logger.error('Scheduled token cleanup failed:', { error: err.message })
+    );
+  }, 86400000);
+  
+  logger.info('API token cleanup scheduled to run daily');
+}
+
 module.exports = {
   createApiToken,
   getUserApiTokens,
   revokeApiToken,
-  validateApiToken
+  validateApiToken,
+  cleanupExpiredTokens,
+  scheduleTokenCleanup
 };

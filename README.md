@@ -11,9 +11,9 @@ A full-stack application for managing forms and form submissions.
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
-- npm or yarn
-- SQL Server
+- Node.js v18 or later
+- npm v9 or later
+- Remote SQL Server connection (configured in .env)
 - Docker and Docker Compose (optional)
 
 ### Development with Docker

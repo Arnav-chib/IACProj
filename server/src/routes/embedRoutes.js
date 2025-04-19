@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/tokenAuth');
+const { authenticateToken } = require('../middleware/auth');
 const { resolveTenant } = require('../middleware/tenantResolver');
 const embedController = require('../controllers/embedController');
 
