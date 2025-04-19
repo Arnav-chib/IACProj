@@ -1,6 +1,6 @@
-const { submitFormResponse, getFormResponses } = require('../services/responseService');
+const { submitFormResponse, getFormResponses: getResponsesService } = require('../services/responseService');
 const sql = require('mssql');
-const { sendSuccess, sendError } = require('../utils/responseUtils');
+const { sendSuccess, sendError } = require('../utils/controllerUtils');
 const asyncHandler = require('express-async-handler');
 
 // Submit response
@@ -30,7 +30,7 @@ const getFormResponses = asyncHandler(async (req, res) => {
     const { id: formId } = req.params;
     
     // Get form responses
-    const responses = await getFormResponses(formId, req.tenantDbConnection);
+    const responses = await getResponsesService(formId, req.tenantDbConnection);
     
     sendSuccess(res, 200, 'Form responses retrieved successfully', { responses });
   } catch (error) {

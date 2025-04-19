@@ -20,19 +20,20 @@ router.put('/about', [
 // Get all blog posts (public)
 router.get('/blog', systemContentController.getBlogPosts);
 
-// Get blog post by slug (public)
-router.get('/blog/:slug', [
-  param('slug').notEmpty().withMessage('Slug is required'),
-  validateRequest
-], systemContentController.getBlogPost);
-
 // Get blog post by ID for editing (system admin only)
+// This specific route must come BEFORE the generic slug route
 router.get('/blog/edit/:contentId', [
   isAuthenticated,
   isSystemAdmin,
   param('contentId').isInt().withMessage('Invalid content ID'),
   validateRequest
 ], systemContentController.getBlogPostById);
+
+// Get blog post by slug (public)
+router.get('/blog/:slug', [
+  param('slug').notEmpty().withMessage('Slug is required'),
+  validateRequest
+], systemContentController.getBlogPost);
 
 // Create blog post (system admin only)
 router.post('/blog', [

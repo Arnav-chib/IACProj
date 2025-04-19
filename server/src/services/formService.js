@@ -80,7 +80,27 @@ async function getUserForms(userId, tenantDb) {
   }
 }
 
+// Check if a user owns a form
+async function isFormOwner(userId, formId, tenantDb) {
+  try {
+    const result = await tenantDb.request()
+      .input('userId', sql.Int, userId)
+      .input('formId', sql.Int, formId)
+      .query(`
+        SELECT COUNT(*) as count
+        FROM FormMaster
+        WHERE ID = @formId AND CreatedBy = @userId
+      `);
+    
+    return result.recordset[0].count > 0;
+  } catch (error) {
+    console.error('Error checking form ownership:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getFormSchema,
-  getUserForms
+  getUserForms,
+  isFormOwner
 };

@@ -1,4 +1,5 @@
-const { getFormSchema, getUserForms } = require('../services/formService');
+const { getFormSchema, getUserForms, isFormOwner } = require('../services/formService');
+const { sendError } = require('../utils/responseUtils');
 
 // Get form by ID
 async function getForm(req, res) {
@@ -32,7 +33,33 @@ async function listForms(req, res) {
   }
 }
 
+// Middleware to validate form ownership
+async function validateFormOwnership(req, res, next) {
+  try {
+    const formId = req.params.id || req.params.formId;
+    const userId = req.user.UserID;
+    
+    if (!formId) {
+      return sendError(res, 400, 'Form ID is required');
+    }
+    
+    // Check if user owns the form
+    const isOwner = await isFormOwner(userId, formId, req.tenantDbConnection);
+    
+    if (!isOwner) {
+      return sendError(res, 403, 'You do not have permission to access this form');
+    }
+    
+    // If user owns the form, proceed
+    next();
+  } catch (error) {
+    console.error('Error validating form ownership:', error);
+    return sendError(res, 500, 'Failed to validate form ownership');
+  }
+}
+
 module.exports = {
   getForm,
-  listForms
+  listForms,
+  validateFormOwnership
 };
