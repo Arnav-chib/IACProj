@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
-import { Editor } from '@tinymce/tinymce-react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { api } from '../services/api';
 
 const AboutUs = () => {
@@ -10,6 +11,7 @@ const AboutUs = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { currentUser } = useAuth();
+  const quillRef = useRef(null);
 
   useEffect(() => {
     fetchAboutUs();
@@ -46,6 +48,26 @@ const AboutUs = () => {
     }
   };
 
+  // Quill editor modules/formats configuration
+  const modules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'color': [] }, { 'background': [] }],
+      ['link', 'image'],
+      ['clean']
+    ],
+  };
+  
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'list', 'bullet',
+    'color', 'background',
+    'link', 'image'
+  ];
+
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -78,30 +100,25 @@ const AboutUs = () => {
 
       {!error && isEditing ? (
         <div className="space-y-4">
-          <Editor
-            apiKey={process.env.REACT_APP_TINYMCE_API_KEY}
-            value={content}
-            onEditorChange={(content) => setContent(content)}
-            init={{
-              height: 500,
-              menubar: false,
-              plugins: [
-                'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-                'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
-              ],
-              toolbar: 'undo redo | blocks | ' +
-                'bold italic forecolor | alignleft aligncenter ' +
-                'alignright alignjustify | bullist numlist outdent indent | ' +
-                'removeformat | help'
-            }}
-          />
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            Save Changes
-          </button>
+          <div className="border rounded-lg overflow-hidden">
+            <ReactQuill
+              ref={quillRef}
+              value={content}
+              onChange={setContent}
+              modules={modules}
+              formats={formats}
+              theme="snow"
+              className="h-64 min-h-full"
+            />
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Save Changes
+            </button>
+          </div>
         </div>
       ) : (
         <div 

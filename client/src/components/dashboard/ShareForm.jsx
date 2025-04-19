@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getForm } from '../../services/formService';
+import { getPublicApiUrl } from '../../services/api';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
 
@@ -10,10 +11,12 @@ const ShareForm = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [copiedItem, setCopiedItem] = useState('');
   const [embedOptions, setEmbedOptions] = useState({
     width: '100%',
     height: '600px'
   });
+  const [usingLocalhost, setUsingLocalhost] = useState(false);
 
   useEffect(() => {
     const fetchForm = async () => {
@@ -21,6 +24,10 @@ const ShareForm = () => {
         setLoading(true);
         const formData = await getForm(formId);
         setForm(formData);
+        
+        // Check if we're using localhost
+        const origin = window.location.origin;
+        setUsingLocalhost(origin.includes('localhost') || origin.includes('127.0.0.1'));
       } catch (err) {
         console.error('Error fetching form:', err);
         setError('Failed to load form. Please try again.');
@@ -33,7 +40,17 @@ const ShareForm = () => {
   }, [formId]);
 
   const getPublicFormUrl = () => {
-    return `${window.location.origin}/forms/${formId}`;
+    // Get the base URL from environment variables if available, otherwise use window.location.origin
+    // This ensures the URL works across different devices
+    const baseUrl = process.env.REACT_APP_PUBLIC_URL || window.location.origin;
+    
+    // If running locally, warn about potential cross-device issues
+    if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+      console.warn('Warning: Using localhost URL which may not be accessible from other devices. ' +
+                  'Set REACT_APP_PUBLIC_URL in your .env file to use a public URL.');
+    }
+    
+    return `${baseUrl}/forms/${formId}`;
   };
 
   const getEmbedCode = () => {
@@ -47,11 +64,15 @@ const ShareForm = () => {
 ></iframe>`;
   };
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text, item) => {
     navigator.clipboard.writeText(text)
       .then(() => {
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setCopiedItem(item);
+        setTimeout(() => {
+          setCopied(false);
+          setCopiedItem('');
+        }, 2000);
       })
       .catch(err => {
         console.error('Failed to copy:', err);
@@ -90,6 +111,18 @@ const ShareForm = () => {
         </Link>
       </div>
 
+      {usingLocalhost && (
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
+          <p className="font-bold">Local Development Warning</p>
+          <p>You are sharing from a localhost environment. The form will not be accessible from other devices unless:</p>
+          <ul className="list-disc pl-5 mt-2">
+            <li>You configure REACT_APP_PUBLIC_URL in your .env file with a public URL</li>
+            <li>You deploy your application to a publicly accessible server</li>
+            <li>You set up port forwarding or a tunnel service (like ngrok)</li>
+          </ul>
+        </div>
+      )}
+
       <div className="bg-white shadow-md rounded-lg overflow-hidden mb-6 p-6">
         <h3 className="text-lg font-semibold mb-4">Public Form Link</h3>
         <p className="mb-2 text-gray-600">Share this link with people to let them fill out your form:</p>
@@ -102,11 +135,15 @@ const ShareForm = () => {
             readOnly
           />
           <button
-            onClick={() => copyToClipboard(getPublicFormUrl())}
+            onClick={() => copyToClipboard(getPublicFormUrl(), 'link')}
             className="bg-blue-600 text-white py-2 px-4 rounded-r-md hover:bg-blue-700"
           >
-            {copied ? 'Copied!' : 'Copy'}
+            {copied && copiedItem === 'link' ? 'Copied!' : 'Copy'}
           </button>
+        </div>
+        
+        <div className="text-sm text-gray-600">
+          <p>Anyone with this link can view and submit the form without needing to log in.</p>
         </div>
       </div>
 
@@ -141,10 +178,10 @@ const ShareForm = () => {
             <code>{getEmbedCode()}</code>
           </pre>
           <button
-            onClick={() => copyToClipboard(getEmbedCode())}
+            onClick={() => copyToClipboard(getEmbedCode(), 'embed')}
             className="absolute top-8 right-2 px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
           >
-            {copied ? 'Copied!' : 'Copy Code'}
+            {copied && copiedItem === 'embed' ? 'Copied!' : 'Copy Code'}
           </button>
         </div>
         

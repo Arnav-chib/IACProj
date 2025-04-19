@@ -1,10 +1,14 @@
 import { api } from './api';
 
-// Get form by ID
+/**
+ * Get form by ID
+ * This function handles fetching a form from the server
+ */
 export const getForm = async (formId) => {
   console.log(`Fetching form ${formId}...`);
   try {
-    const response = await api.get(`/forms/${formId}`);
+    // Make the API request - we add a cache-busting parameter to avoid caching issues
+    const response = await api.get(`/forms/${formId}?t=${Date.now()}`);
     console.log('Form response:', response.data);
     
     // Handle different response formats
@@ -19,6 +23,15 @@ export const getForm = async (formId) => {
     return formData;
   } catch (error) {
     console.error(`Error fetching form ${formId}:`, error);
+    
+    // Enhance error message with more details
+    if (error.code === 'ERR_NETWORK') {
+      console.error('Network error details:', {
+        baseURL: api.defaults.baseURL,
+        formId
+      });
+    }
+    
     throw error;
   }
 };
@@ -31,10 +44,30 @@ export const getForms = async () => {
   return response.data.forms || [];
 };
 
-// Submit form response
+/**
+ * Submit form response
+ * This function handles submitting a form response to the server
+ */
 export const submitResponse = async (formId, responseData) => {
-  const response = await api.post(`/forms/${formId}/responses`, responseData);
-  return response.data;
+  console.log(`Submitting response for form ${formId}...`);
+  try {
+    const response = await api.post(`/forms/${formId}/responses`, responseData);
+    console.log('Submit response result:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error submitting form ${formId}:`, error);
+    
+    // Provide more detailed error information
+    if (error.code === 'ERR_NETWORK') {
+      console.error('Network error details for submission:', {
+        baseURL: api.defaults.baseURL,
+        formId,
+        dataSize: JSON.stringify(responseData).length
+      });
+    }
+    
+    throw error;
+  }
 };
 
 // Get form responses

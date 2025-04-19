@@ -5,14 +5,22 @@ import { handleApiError } from '../utils/errorHandler';
 // Configure default axios instance
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || '/api',
-  timeout: 10000,
+  timeout: 30000, // Increase timeout for slower connections
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
+// Get the public API URL for when we need to make absolute URLs (for sharing)
+const publicApiUrl = process.env.REACT_APP_PUBLIC_API_URL || 
+                     (window.location.origin + '/api');
+
 // Add debugging to see what URL is being used
 console.log('API Base URL:', api.defaults.baseURL);
+console.log('Public API URL:', publicApiUrl);
+
+// Export the public API URL for use in components
+export const getPublicApiUrl = () => publicApiUrl;
 
 // Request interceptor to add auth token
 api.interceptors.request.use(

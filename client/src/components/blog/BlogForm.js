@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { Editor } from '@tinymce/tinymce-react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 const BlogForm = () => {
   const { action, id } = useParams(); // action can be 'new' or 'edit', id is contentId
   const navigate = useNavigate();
   const isEditMode = action === 'edit';
+  const quillRef = useRef(null);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -16,6 +18,30 @@ const BlogForm = () => {
   });
   const [isLoading, setIsLoading] = useState(isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Quill editor modules/formats configuration
+  const modules = {
+    toolbar: [
+      [{ 'header': [1, 2, 3, false] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'color': [] }, { 'background': [] }],
+      ['link', 'image'],
+      ['clean'],
+      [{ 'align': [] }],
+      ['code-block']
+    ],
+  };
+  
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'list', 'bullet',
+    'color', 'background',
+    'link', 'image',
+    'align',
+    'code-block'
+  ];
 
   const fetchBlogPost = useCallback(async () => {
     try {
@@ -164,24 +190,17 @@ const BlogForm = () => {
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Content
           </label>
-          <Editor
-            apiKey={process.env.REACT_APP_TINYMCE_API_KEY}
-            value={formData.content}
-            onEditorChange={handleEditorChange}
-            init={{
-              height: 500,
-              menubar: true,
-              plugins: [
-                'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
-                'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
-                'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
-              ],
-              toolbar: 'undo redo | blocks | ' +
-                'bold italic forecolor | alignleft aligncenter ' +
-                'alignright alignjustify | bullist numlist outdent indent | ' +
-                'removeformat | help'
-            }}
-          />
+          <div className="border rounded-lg overflow-hidden">
+            <ReactQuill
+              ref={quillRef}
+              value={formData.content}
+              onChange={handleEditorChange}
+              modules={modules}
+              formats={formats}
+              theme="snow"
+              className="h-96"
+            />
+          </div>
         </div>
         
         <div className="flex gap-4">
