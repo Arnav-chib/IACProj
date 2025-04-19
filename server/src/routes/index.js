@@ -28,7 +28,8 @@ routeFiles.forEach(file => {
         apiPath = '/health';
         break;
       case 'systemcontent':
-        apiPath = '/system';
+        // Use a shorter path for system content to make blogs and about us more accessible
+        apiPath = '/';  // This will make /api/blog and /api/about work
         break;
       case 'orgmember':
         apiPath = '/organizations';

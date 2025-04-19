@@ -3,7 +3,7 @@ const {
   updateAboutUs, 
   getAllBlogPosts, 
   getBlogPostBySlug,
-  getBlogPostById,
+  getBlogPostById: fetchBlogPostById,
   createBlogPost, 
   updateBlogPost, 
   deleteBlogPost 
@@ -65,7 +65,7 @@ const getBlogPost = asyncHandler(async (req, res) => {
 const getBlogPostById = asyncHandler(async (req, res) => {
   const { contentId } = req.params;
   
-  const blogPost = await getBlogPostById(contentId);
+  const blogPost = await fetchBlogPostById(contentId);
   
   if (!blogPost) {
     return sendError(res, 404, 'Blog post not found');

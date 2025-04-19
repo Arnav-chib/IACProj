@@ -50,7 +50,7 @@ const BlogForm = () => {
   const fetchBlogPost = useCallback(async () => {
     try {
       // Use a different endpoint for retrieving blog post by ID
-      const response = await api.get(`/system/blog/edit/${id}`);
+      const response = await api.get(`/blog/edit/${id}`);
       const post = response.data.data;
       
       if (post) {
@@ -123,12 +123,12 @@ const BlogForm = () => {
       
       if (isEditMode) {
         // Use the api service instead of axios directly
-        const response = await api.put(`/system/blog/${id}`, formData);
+        const response = await api.put(`/blog/${id}`, formData);
         console.log('Blog update response:', response);
         toast.success('Blog post updated successfully');
       } else {
         // Use the api service instead of axios directly
-        const response = await api.post('/system/blog', formData);
+        const response = await api.post('/blog', formData);
         console.log('Blog create response:', response);
         toast.success('Blog post created successfully');
       }
@@ -136,7 +136,7 @@ const BlogForm = () => {
       navigate('/blog');
     } catch (error) {
       console.error('Error saving blog post:', error);
-      console.error('API endpoint:', isEditMode ? `/system/blog/${id}` : '/system/blog');
+      console.error('API endpoint:', isEditMode ? `/blog/${id}` : '/blog');
       console.error('Response status:', error.response?.status);
       console.error('Response data:', error.response?.data);
       

@@ -13,7 +13,7 @@ const BlogList = () => {
     const fetchBlogPosts = async () => {
       try {
         console.log('Fetching blog posts...');
-        const response = await api.get('/system/blog');
+        const response = await api.get('/blog');
         console.log('Blog posts response:', response.data);
         setPosts(response.data.data || []);
         setIsLoading(false);

@@ -27,7 +27,7 @@ const AboutUs = () => {
   const fetchAboutUs = async () => {
     try {
       console.log('Fetching About Us content...');
-      const response = await api.get('/system/about');
+      const response = await api.get('/about');
       console.log('About Us response:', response.data);
       setContent(response.data.data ? response.data.data.Content : '');
       setIsLoading(false);
@@ -43,7 +43,7 @@ const AboutUs = () => {
   const handleSave = async () => {
     try {
       console.log('Updating About Us content...');
-      const response = await api.put('/system/about', { content });
+      const response = await api.put('/about', { content });
       console.log('Update response:', response);
       setIsEditing(false);
       toast.success('About Us content updated successfully');

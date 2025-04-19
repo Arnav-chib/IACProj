@@ -13,7 +13,7 @@ const BlogDetail = () => {
 
   const fetchBlogPost = useCallback(async () => {
     try {
-      const response = await api.get(`/system/blog/${slug}`);
+      const response = await api.get(`/blog/${slug}`);
       setPost(response.data.data);
       setIsLoading(false);
     } catch (error) {
@@ -39,7 +39,7 @@ const BlogDetail = () => {
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this blog post?')) {
       try {
-        await api.delete(`/system/blog/${post.ContentID}`);
+        await api.delete(`/blog/${post.ContentID}`);
         toast.success('Blog post deleted successfully');
         navigate('/blog');
       } catch (error) {
