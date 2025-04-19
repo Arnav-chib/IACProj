@@ -49,8 +49,16 @@ const BaseFieldWrapper = ({
   
   // When the internal field value changes, propagate it up with approval status
   const handleFieldChange = (newValue, event) => {
+    console.log(`BaseFieldWrapper ${id} field change:`, { type: field.type, needsApproval });
+    
     // Store current scroll position
     const scrollPosition = window.scrollY;
+    
+    // Always prevent default behavior to stop form submission
+    if (event) {
+      if (event.preventDefault) event.preventDefault();
+      if (event.stopPropagation) event.stopPropagation();
+    }
     
     setFieldValue(newValue);
     
@@ -63,12 +71,19 @@ const BaseFieldWrapper = ({
     setTimeout(() => {
       window.scrollTo(0, scrollPosition);
     }, 0);
+    
+    // Return false to stop event propagation
+    return false;
   };
   
   // When approval status changes, update the value
   const handleApprovalChange = (e) => {
     // Store current scroll position
     const scrollPosition = window.scrollY;
+    
+    // Prevent default actions
+    e.preventDefault();
+    e.stopPropagation();
     
     const newApproved = e.target.checked;
     console.log(`Approval change for ${id}: ${isApproved} -> ${newApproved}`);
@@ -86,6 +101,8 @@ const BaseFieldWrapper = ({
     setTimeout(() => {
       window.scrollTo(0, scrollPosition);
     }, 0);
+    
+    return false;
   };
   
   // Clone the children with new props

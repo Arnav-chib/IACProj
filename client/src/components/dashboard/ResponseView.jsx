@@ -223,6 +223,36 @@ const ResponseView = () => {
     }
   };
 
+  // Function to get the file URL from a file field value
+  const getFileUrl = (value) => {
+    if (!value) return null;
+    
+    try {
+      // If value is a string that looks like JSON, try to parse it
+      if (typeof value === 'string' && value.startsWith('{')) {
+        const parsed = JSON.parse(value);
+        
+        // Handle different formats of file data
+        if (parsed.url) return parsed.url;
+        if (parsed.value && parsed.value.url) return parsed.value.url;
+        if (parsed.filePath) return parsed.filePath;
+        if (parsed.value && parsed.value.filePath) return parsed.value.filePath;
+      }
+      
+      // If value is already an object
+      if (typeof value === 'object') {
+        if (value.url) return value.url;
+        if (value.filePath) return value.filePath;
+      }
+      
+      // If nothing else works, return the value itself if it's a string
+      return typeof value === 'string' ? value : null;
+    } catch (e) {
+      console.error('Error getting file URL:', e, value);
+      return null;
+    }
+  };
+
   // Function to format response values based on field type
   const formatValue = (field, value) => {
     if (value === undefined || value === null) {
@@ -403,14 +433,21 @@ const ResponseView = () => {
                     </h4>
                     <div className="mt-1">
                       {field.type === 'file' ? (
-                        <a 
-                          href={displayValue} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          View Uploaded File
-                        </a>
+                        (() => {
+                          const fileUrl = getFileUrl(selectedResponse.values[field.id]);
+                          if (!fileUrl) return <p>No file uploaded</p>;
+                          
+                          return (
+                            <a 
+                              href={fileUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              View Uploaded File
+                            </a>
+                          );
+                        })()
                       ) : field.type === 'richtext' ? (
                         <div className="prose">
                           {/* Render rich text content safely */}

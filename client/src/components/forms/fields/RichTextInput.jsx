@@ -5,6 +5,8 @@ import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css';
 import PropTypes from 'prop-types';
 
 const RichTextInput = ({ id, label, value, onChange, required, error, needsApproval, isFormCreator, disabled }) => {
+  console.log(`RichTextInput rendering for ${id}:`, { value, needsApproval, isFormCreator, disabled });
+  
   const [editorState, setEditorState] = useState(() => {
     if (value && typeof value === 'string' && value.startsWith('{')) {
       try {
@@ -18,13 +20,13 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
         }
         return EditorState.createWithContent(convertFromRaw(parsedValue));
       } catch (e) {
-        console.error('Error parsing rich text content:', e);
+        console.error('Error parsing rich text content:', e, value);
         // If parsing fails, use as plain text
         return EditorState.createWithContent(ContentState.createFromText(value));
       }
     } else if (value) {
       // Use as plain text
-      return EditorState.createWithContent(ContentState.createFromText(value));
+      return EditorState.createWithContent(ContentState.createFromText(String(value)));
     }
     // Empty editor
     return EditorState.createEmpty();
@@ -49,6 +51,7 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
   }, [value]);
 
   const handleEditorChange = (newState) => {
+    console.log(`Editor changed for ${id}`);
     setEditorState(newState);
     const rawContent = convertToRaw(newState.getCurrentContent());
     
@@ -75,12 +78,8 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
     onChange(JSON.stringify(newValue));
   };
 
-  // In edit mode, always show the editor regardless of approval status
-  // shouldDisplayContent was previously conditioning display, which is incorrect
+  // Always show editor - approval only affects viewing in responses, not editing
   const isReadOnly = disabled;
-  
-  // When viewing responses, approval status determines visibility 
-  // (but we're not in that mode here, this is for filling out the form)
 
   return (
     <div className="mb-4">
@@ -99,6 +98,8 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
             options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'link', 'image', 'remove', 'history'],
           }}
           readOnly={isReadOnly}
+          stripPastedStyles={false}
+          handlePastedText={(text, html, editorState) => false} // Let default paste behavior work
         />
       </div>
       

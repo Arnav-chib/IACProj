@@ -28,8 +28,11 @@ const Dropdown = ({
   }, [value, multiple]);
 
   const handleChange = (e) => {
-    // Prevent default browser behavior
+    console.log(`Dropdown ${id} change event`);
+    
+    // This is crucial - prevent default right away before any state updates
     e.preventDefault();
+    e.stopPropagation();
     
     // Store current scroll position
     const scrollPosition = window.scrollY;
@@ -53,12 +56,25 @@ const Dropdown = ({
     setTimeout(() => {
       window.scrollTo(0, scrollPosition);
     }, 0);
+    
+    // Return false to ensure event doesn't bubble up
+    return false;
   };
 
   // Prevent mousedown default behavior which can cause perceived refresh
   const handleMouseDown = (e) => {
+    // Allow the dropdown to open normally
+    // Just stop propagation to prevent any parent handlers
     e.stopPropagation();
-    // Don't prevent default here as it would prevent the dropdown from opening
+  };
+  
+  // Prevent enter key from submitting the form
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
   };
 
   return (
@@ -76,6 +92,7 @@ const Dropdown = ({
         value={internalValue}
         onChange={handleChange}
         onMouseDown={handleMouseDown}
+        onKeyDown={handleKeyDown}
         required={required}
         multiple={multiple}
         className={`block w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${multiple ? 'min-h-[100px]' : ''}`}

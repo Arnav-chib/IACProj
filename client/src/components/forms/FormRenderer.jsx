@@ -64,12 +64,15 @@ const FormRenderer = () => {
   }, [formId]);
   
   const handleFieldChange = (fieldId, value, event) => {
+    console.log(`Field change: ${fieldId}`, { value, event: event?.type });
+    
     // Store current scroll position
     const scrollPosition = window.scrollY;
     
     // Prevent form submission and page scroll
-    if (event && event.preventDefault) {
-      event.preventDefault();
+    if (event) {
+      if (event.preventDefault) event.preventDefault();
+      if (event.stopPropagation) event.stopPropagation();
     }
     
     setFormValues(prev => ({
@@ -438,7 +441,7 @@ const FormRenderer = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}>
         {form.fields
           .filter(field => !field.groupId)
           .sort((a, b) => a.position - b.position)
