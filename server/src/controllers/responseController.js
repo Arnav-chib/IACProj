@@ -32,7 +32,10 @@ const getFormResponses = asyncHandler(async (req, res) => {
     // Get form responses
     const responses = await getResponsesService(formId, req.tenantDbConnection);
     
-    sendSuccess(res, 200, 'Form responses retrieved successfully', { responses });
+    // Ensure responses is always an array
+    const responseArray = Array.isArray(responses) ? responses : [];
+    
+    sendSuccess(res, 200, 'Form responses retrieved successfully', { responses: responseArray });
   } catch (error) {
     console.error('Error getting form responses:', error);
     sendError(res, 500, 'Failed to retrieve form responses');

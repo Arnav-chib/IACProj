@@ -36,7 +36,8 @@ const ResponseView = () => {
         // Only update state if component is still mounted
         if (isMounted) {
           setForm(formData);
-          setResponses(responseData);
+          // Ensure responseData is always an array
+          setResponses(Array.isArray(responseData) ? responseData : []);
           setLoading(false);
         }
       } catch (err) {
@@ -243,7 +244,7 @@ const ResponseView = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {responses.map((response, index) => (
+              {Array.isArray(responses) && responses.map((response, index) => (
                 <tr key={response.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(response.submittedAt).toLocaleString()}
