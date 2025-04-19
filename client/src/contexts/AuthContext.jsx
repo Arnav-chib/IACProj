@@ -26,10 +26,26 @@ export const AuthProvider = ({ children }) => {
 
   const validateToken = async () => {
     try {
+      console.log('Validating auth token...');
       const response = await apiService.getCurrentUser();
-      setCurrentUser(response.user);
+      console.log('Auth validation response:', response);
+      
+      if (!response || !response.user) {
+        console.error('Invalid auth response - missing user data:', response);
+        throw new Error('Invalid authentication response');
+      }
+      
+      // Ensure user object has all required properties
+      const user = {
+        ...response.user,
+        isSystemAdmin: !!response.user.isSystemAdmin  // Ensure boolean value
+      };
+      
+      console.log('Setting current user:', user);
+      setCurrentUser(user);
       setError(null);
     } catch (error) {
+      console.error('Token validation error:', error);
       // Clear token if invalid
       localStorage.removeItem('token');
       setCurrentUser(null);

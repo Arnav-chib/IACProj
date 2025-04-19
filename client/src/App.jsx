@@ -15,6 +15,7 @@ const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword'));
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
 const ApiTokens = lazy(() => import('./components/dashboard/ApiTokens'));
 const ResponseView = lazy(() => import('./components/dashboard/ResponseView'));
+const ShareForm = lazy(() => import('./components/dashboard/ShareForm'));
 const FormRenderer = lazy(() => import('./components/forms/FormRenderer'));
 const AboutUs = lazy(() => import('./components/AboutUs'));
 const BlogList = lazy(() => import('./components/blog/BlogList'));
@@ -129,6 +130,14 @@ const AppContent = () => {
                 element={
                   <ProtectedRoute>
                     <ResponseView />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/dashboard/forms/:formId/share" 
+                element={
+                  <ProtectedRoute>
+                    <ShareForm />
                   </ProtectedRoute>
                 } 
               />

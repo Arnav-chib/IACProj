@@ -87,6 +87,12 @@ const FormList = () => {
                   >
                     View Responses
                   </Link>
+                  <Link
+                    to={`/dashboard/forms/${form.ID}/share`}
+                    className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm"
+                  >
+                    Share Form
+                  </Link>
                 </div>
               </div>
             </li>
