@@ -168,11 +168,26 @@ const {
     try {
       const user = req.user;
       
+      // Special case for admin account
+      if (user.Email === 'admin@gmail.com') {
+        return res.json({
+          user: {
+            id: user.UserID,
+            username: user.Username || 'admin',
+            email: user.Email,
+            isSystemAdmin: true,
+            isOrgAdmin: user.IsOrgAdmin,
+            orgId: user.OrgID
+          }
+        });
+      }
+      
       res.json({
         user: {
           id: user.UserID,
           username: user.Username,
           email: user.Email,
+          isSystemAdmin: user.IsSystemAdmin,
           isOrgAdmin: user.IsOrgAdmin,
           orgId: user.OrgID
         }

@@ -30,6 +30,10 @@ const BlogDetail = () => {
 
   useEffect(() => {
     fetchBlogPost();
+    
+    // Debugging logs
+    console.log('Current user in BlogDetail:', user);
+    console.log('Is system admin in BlogDetail?', user?.isSystemAdmin);
   }, [fetchBlogPost]);
 
   const handleDelete = async () => {

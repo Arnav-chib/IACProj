@@ -5,13 +5,26 @@ let masterPool;
 
 // Initialize the master pool
 async function init() {
-  masterPool = await initializeMasterDbPool();
+  try {
+    console.log('Initializing master pool for token controller');
+    masterPool = await initializeMasterDbPool();
+    console.log('Master pool initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize master pool for token controller:', error);
+  }
 }
+// Call init immediately
 init();
 
 // Create a new API token
 async function createToken(req, res) {
   try {
+    // Ensure masterPool is initialized
+    if (!masterPool) {
+      console.log('Master pool not initialized, initializing now');
+      await init();
+    }
+    
     const { name, permissions } = req.body;
     const userId = req.user.UserID;
     
@@ -42,6 +55,12 @@ async function createToken(req, res) {
 // List user's API tokens
 async function listTokens(req, res) {
   try {
+    // Ensure masterPool is initialized
+    if (!masterPool) {
+      console.log('Master pool not initialized, initializing now');
+      await init();
+    }
+    
     const userId = req.user.UserID;
     
     // Get tokens
@@ -57,6 +76,12 @@ async function listTokens(req, res) {
 // Revoke an API token
 async function revokeToken(req, res) {
   try {
+    // Ensure masterPool is initialized
+    if (!masterPool) {
+      console.log('Master pool not initialized, initializing now');
+      await init();
+    }
+    
     const { id } = req.params;
     const userId = req.user.UserID;
     

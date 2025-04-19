@@ -13,6 +13,10 @@ const AboutUs = () => {
 
   useEffect(() => {
     fetchAboutUs();
+    
+    // Debugging logs
+    console.log('Current user:', user);
+    console.log('Is system admin?', user?.isSystemAdmin);
   }, []);
 
   const fetchAboutUs = async () => {
