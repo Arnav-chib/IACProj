@@ -28,6 +28,9 @@ const Dropdown = ({
   }, [value, multiple]);
 
   const handleChange = (e) => {
+    // Prevent default browser behavior
+    e.preventDefault();
+    
     // Store current scroll position
     const scrollPosition = window.scrollY;
     
@@ -52,6 +55,12 @@ const Dropdown = ({
     }, 0);
   };
 
+  // Prevent mousedown default behavior which can cause perceived refresh
+  const handleMouseDown = (e) => {
+    e.stopPropagation();
+    // Don't prevent default here as it would prevent the dropdown from opening
+  };
+
   return (
     <div className="mb-4">
       <label 
@@ -66,6 +75,7 @@ const Dropdown = ({
         id={id}
         value={internalValue}
         onChange={handleChange}
+        onMouseDown={handleMouseDown}
         required={required}
         multiple={multiple}
         className={`block w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${multiple ? 'min-h-[100px]' : ''}`}

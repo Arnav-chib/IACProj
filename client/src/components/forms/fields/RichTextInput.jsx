@@ -4,7 +4,7 @@ import { EditorState, ContentState, convertToRaw, convertFromRaw } from 'draft-j
 import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css';
 import PropTypes from 'prop-types';
 
-const RichTextInput = ({ id, label, value, onChange, required, error, needsApproval, isFormCreator }) => {
+const RichTextInput = ({ id, label, value, onChange, required, error, needsApproval, isFormCreator, disabled }) => {
   const [editorState, setEditorState] = useState(() => {
     if (value && typeof value === 'string' && value.startsWith('{')) {
       try {
@@ -75,35 +75,32 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
     onChange(JSON.stringify(newValue));
   };
 
-  // Check if field should be displayed (either not requiring approval or approved)
-  const shouldShowContent = !needsApproval || isApproved || isFormCreator;
+  // In edit mode, always show the editor regardless of approval status
+  // shouldDisplayContent was previously conditioning display, which is incorrect
+  const isReadOnly = disabled;
+  
+  // When viewing responses, approval status determines visibility 
+  // (but we're not in that mode here, this is for filling out the form)
 
   return (
     <div className="mb-4">
       <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor={id}>
         {label} {required && <span className="text-red-500">*</span>}
         {needsApproval && <span className="text-blue-500 ml-1">(Requires Approval)</span>}
-        {needsApproval && !isApproved && !isFormCreator && <span className="text-orange-500 ml-1">(Pending Approval)</span>}
       </label>
       
-      {shouldShowContent ? (
-        <div className="border rounded p-2 bg-white">
-          <Editor
-            editorState={editorState}
-            onEditorStateChange={handleEditorChange}
-            wrapperClassName="rich-text-wrapper"
-            editorClassName="rich-text-editor min-h-[200px]"
-            toolbar={{
-              options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'link', 'image', 'remove', 'history'],
-            }}
-            readOnly={needsApproval && !isFormCreator && !isApproved}
-          />
-        </div>
-      ) : (
-        <div className="border rounded p-2 bg-gray-100 text-gray-500 min-h-[200px] flex items-center justify-center">
-          <p>Content pending approval</p>
-        </div>
-      )}
+      <div className="border rounded p-2 bg-white">
+        <Editor
+          editorState={editorState}
+          onEditorStateChange={handleEditorChange}
+          wrapperClassName="rich-text-wrapper"
+          editorClassName="rich-text-editor min-h-[200px]"
+          toolbar={{
+            options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'link', 'image', 'remove', 'history'],
+          }}
+          readOnly={isReadOnly}
+        />
+      </div>
       
       {error && <p className="text-red-500 text-xs italic mt-1">{error}</p>}
       
@@ -117,7 +114,7 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
             className="mr-2"
           />
           <label htmlFor={`${id}-approval`} className="text-sm text-gray-700">
-            Approve
+            Approve Content (for viewing in responses)
           </label>
         </div>
       )}
@@ -133,7 +130,8 @@ RichTextInput.propTypes = {
   required: PropTypes.bool,
   error: PropTypes.string,
   needsApproval: PropTypes.bool,
-  isFormCreator: PropTypes.bool
+  isFormCreator: PropTypes.bool,
+  disabled: PropTypes.bool
 };
 
 RichTextInput.defaultProps = {
@@ -141,7 +139,8 @@ RichTextInput.defaultProps = {
   required: false,
   error: null,
   needsApproval: false,
-  isFormCreator: false
+  isFormCreator: false,
+  disabled: false
 };
 
 export default RichTextInput; 

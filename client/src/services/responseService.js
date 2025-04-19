@@ -13,6 +13,20 @@ export const processFieldValue = (value, fieldType, needsApproval, isApproved = 
     return value;
   }
   
+  // Special handling for rich text fields
+  if (fieldType === 'richtext') {
+    // Rich text already has its own structure with content
+    try {
+      if (typeof value === 'string' && value.startsWith('{')) {
+        const parsed = JSON.parse(value);
+        parsed.isApproved = isApproved;
+        return JSON.stringify(parsed);
+      }
+    } catch (e) {
+      console.error('Error processing rich text field value:', e);
+    }
+  }
+  
   // For fields that need approval, wrap the value with approval status
   return JSON.stringify({
     value,
@@ -32,27 +46,19 @@ export const parseFieldValue = (value, fieldType) => {
     if (typeof value === 'string' && value.startsWith('{')) {
       const parsed = JSON.parse(value);
       
-      // If it has approval status directly
-      if (parsed.isApproved !== undefined) {
-        // Special case for rich text
-        if (fieldType === 'richtext' && parsed.content) {
-          return {
-            value: parsed,
-            isApproved: parsed.isApproved || false
-          };
-        }
-        
+      // Special case for rich text
+      if (fieldType === 'richtext') {
         return {
-          value: parsed.value !== undefined ? parsed.value : parsed,
-          isApproved: parsed.isApproved
+          value: parsed, // Keep the whole structure for rich text
+          isApproved: parsed.isApproved || false
         };
       }
       
-      // Special case for rich text which has a different structure
-      if (fieldType === 'richtext' && parsed.content) {
+      // If it has approval status directly
+      if (parsed.isApproved !== undefined) {
         return {
-          value: parsed,
-          isApproved: parsed.isApproved || false
+          value: parsed.value !== undefined ? parsed.value : parsed,
+          isApproved: parsed.isApproved
         };
       }
     }
@@ -85,7 +91,8 @@ export const formatFieldValue = (value, field) => {
   // Extract the actual value if it's wrapped with approval status
   const { value: extractedValue, isApproved } = parseFieldValue(value, field.type);
   
-  // If field needs approval and is not approved, don't show content
+  // If field needs approval, show it conditionally based on user role
+  // This is only for display in response views, not for editing
   if (field.needsApproval && !isApproved) {
     return 'Content pending approval';
   }
@@ -131,8 +138,13 @@ export const isFieldApproved = (value, field) => {
     return true;
   }
   
-  const { isApproved } = parseFieldValue(value, field.type);
-  return isApproved;
+  try {
+    const { isApproved } = parseFieldValue(value, field.type);
+    return isApproved;
+  } catch (e) {
+    console.error('Error checking if field is approved:', e);
+    return false;
+  }
 };
 
 /**
@@ -145,6 +157,7 @@ export const isFieldApproved = (value, field) => {
  */
 export const updateFieldApproval = async (formId, responseId, fieldId, isApproved) => {
   try {
+    console.log(`Updating approval for field ${fieldId} to ${isApproved}`);
     const response = await api.put(
       `/forms/${formId}/responses/${responseId}/fields/${fieldId}/approval`,
       { isApproved }

@@ -125,21 +125,72 @@ const ResponseView = () => {
     }));
   };
   
-  const handleApproveConfirm = async () => {
+  const handleApproveSubmit = async () => {
     try {
-      // Update each field that needs approval
-      const updatePromises = Object.entries(fieldApprovals).map(([fieldId, isApproved]) => 
-        updateFieldApproval(formId, approvingResponse.id, fieldId, isApproved)
-      );
+      // Get a list of fields that need approval
+      const fieldsRequiringApproval = form.fields.filter(f => f.needsApproval);
+      
+      console.log('Submitting field approvals:', fieldApprovals);
+      console.log('Fields requiring approval:', fieldsRequiringApproval);
+      
+      // Update each field's approval status
+      const updatePromises = fieldsRequiringApproval.map(field => {
+        console.log(`Updating approval for field ${field.id}: ${fieldApprovals[field.id]}`);
+        return updateFieldApproval(
+          formId,
+          approvingResponse.id,
+          field.id,
+          fieldApprovals[field.id] || false
+        );
+      });
       
       await Promise.all(updatePromises);
       
-      toast.success('Response approval status updated successfully');
-      setIsApproveModalOpen(false);
+      // Update the response in the local state to reflect the new approval statuses
+      setResponses(prevResponses => {
+        return prevResponses.map(response => {
+          if (response.id === approvingResponse.id) {
+            // Create a deep copy of the response
+            const updatedResponse = { ...response };
+            updatedResponse.values = { ...response.values };
+            
+            // Update approval status for each field
+            fieldsRequiringApproval.forEach(field => {
+              const currentValue = response.values[field.id];
+              
+              if (field.type === 'richtext') {
+                try {
+                  // For rich text fields
+                  if (typeof currentValue === 'string' && currentValue.startsWith('{')) {
+                    const parsed = JSON.parse(currentValue);
+                    parsed.isApproved = fieldApprovals[field.id] || false;
+                    updatedResponse.values[field.id] = JSON.stringify(parsed);
+                  }
+                } catch (e) {
+                  console.error('Error updating rich text approval:', e);
+                }
+              } else {
+                // For other field types
+                try {
+                  const { value: extractedValue } = parseFieldValue(currentValue, field.type);
+                  updatedResponse.values[field.id] = JSON.stringify({
+                    value: extractedValue,
+                    isApproved: fieldApprovals[field.id] || false
+                  });
+                } catch (e) {
+                  console.error('Error updating field approval:', e);
+                }
+              }
+            });
+            
+            return updatedResponse;
+          }
+          return response;
+        });
+      });
       
-      // Refresh the responses to get updated data
-      const refreshedResponses = await getFormResponses(formId);
-      setResponses(refreshedResponses);
+      toast.success('Approval status updated successfully');
+      setIsApproveModalOpen(false);
     } catch (err) {
       console.error('Error updating approval status:', err);
       const errorMsg = err.response?.data?.error || err.message || 'Failed to update approval status';
@@ -149,20 +200,41 @@ const ResponseView = () => {
 
   // Function to check if a field is approved
   const checkApprovalStatus = (field, value) => {
-    if (!field.needsApproval) return true;
+    if (!field.needsApproval) {
+      return true;
+    }
     
-    return isFieldApproved(value, field);
+    try {
+      return isFieldApproved(value, field);
+    } catch (e) {
+      console.error('Error checking approval status:', e, field, value);
+      return false;
+    }
   };
 
   // Function to extract the actual value from a field that has approval status
   const extractFieldValue = (value, fieldType) => {
-    const { value: extractedValue } = parseFieldValue(value, fieldType);
-    return extractedValue;
+    try {
+      const { value: extractedValue } = parseFieldValue(value, fieldType);
+      return extractedValue;
+    } catch (e) {
+      console.error('Error extracting field value:', e);
+      return value;
+    }
   };
 
   // Function to format response values based on field type
   const formatValue = (field, value) => {
-    return formatFieldValue(value, field);
+    if (value === undefined || value === null) {
+      return '-';
+    }
+    
+    try {
+      return formatFieldValue(value, field);
+    } catch (e) {
+      console.error('Error formatting field value:', e);
+      return String(value);
+    }
   };
   
   // Check if the form has any fields that need approval
@@ -390,28 +462,76 @@ const ResponseView = () => {
           onClose={() => setIsApproveModalOpen(false)}
         >
           <div className="p-4">
-            <h3 className="text-lg font-medium mb-4">Manage Approvals</h3>
+            <h3 className="text-lg font-medium mb-4">
+              Approval Status for Response #{approvingResponse.id}
+            </h3>
             
-            <div className="space-y-4">
-              {form && form.fields && form.fields.filter(field => field.needsApproval).map(field => (
-                <div key={field.id} className="flex items-center justify-between p-2 border rounded">
-                  <div className="flex-1 mr-4">
-                    <span className="font-medium">{field.name}</span>
-                    <p className="text-sm text-gray-500">
-                      {formatValue(field, approvingResponse.values[field.id])}
-                    </p>
-                  </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={fieldApprovals[field.id] || false}
-                      onChange={() => handleApprovalChange(field.id)}
-                      className="form-checkbox h-5 w-5 text-blue-600"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Approve</span>
-                  </label>
-                </div>
-              ))}
+            <div className="space-y-4 max-h-[400px] overflow-y-auto">
+              {form && form.fields && form.fields
+                .filter(field => field.needsApproval)
+                .map(field => {
+                  const currentValue = approvingResponse.values[field.id];
+                  const isCurrentlyApproved = checkApprovalStatus(field, currentValue);
+                  
+                  return (
+                    <div key={field.id} className="border-b pb-4">
+                      <div className="flex items-start">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-700">
+                            {field.name}
+                            <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                              fieldApprovals[field.id] 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {fieldApprovals[field.id] ? 'Approved' : 'Pending'}
+                            </span>
+                          </h4>
+                          <div className="mt-2 bg-gray-50 p-2 rounded">
+                            {field.type === 'richtext' ? (
+                              <div className="prose prose-sm max-w-none">
+                                {(() => {
+                                  try {
+                                    const extractedValue = extractFieldValue(currentValue, field.type);
+                                    if (extractedValue && extractedValue.content) {
+                                      return <div dangerouslySetInnerHTML={{ 
+                                        __html: extractedValue.content.blocks?.map(b => {
+                                          // Basic XSS protection for user-generated content
+                                          const text = String(b.text || '')
+                                            .replace(/</g, '&lt;')
+                                            .replace(/>/g, '&gt;');
+                                          return text;
+                                        }).join('<br/>') || '' 
+                                      }} />;
+                                    }
+                                    return <p>{String(extractedValue)}</p>;
+                                  } catch (e) {
+                                    console.error('Error rendering rich text:', e);
+                                    return <p>{String(currentValue || '')}</p>;
+                                  }
+                                })()}
+                              </div>
+                            ) : (
+                              <p>{formatValue(field, currentValue)}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="ml-4 mt-1">
+                          <input
+                            type="checkbox"
+                            id={`approve-${field.id}`}
+                            checked={fieldApprovals[field.id] || false}
+                            onChange={() => handleApprovalChange(field.id)}
+                            className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`approve-${field.id}`} className="sr-only">
+                            Approve {field.name}
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
             
             <div className="mt-6 flex justify-end space-x-2">
@@ -422,10 +542,10 @@ const ResponseView = () => {
                 Cancel
               </Button>
               <Button 
-                onClick={handleApproveConfirm}
+                onClick={handleApproveSubmit}
                 variant="primary"
               >
-                Save Approvals
+                Save Approval Status
               </Button>
             </div>
           </div>

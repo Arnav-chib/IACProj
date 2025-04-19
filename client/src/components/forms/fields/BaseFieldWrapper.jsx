@@ -53,6 +53,9 @@ const BaseFieldWrapper = ({
     const scrollPosition = window.scrollY;
     
     setFieldValue(newValue);
+    
+    // Don't change approval status when editing content
+    // Only apply the current approval status
     const processedValue = processFieldValue(newValue, field.type, needsApproval, isApproved);
     onChange(processedValue, event);
     
@@ -68,12 +71,14 @@ const BaseFieldWrapper = ({
     const scrollPosition = window.scrollY;
     
     const newApproved = e.target.checked;
+    console.log(`Approval change for ${id}: ${isApproved} -> ${newApproved}`);
     setIsApproved(newApproved);
     
     if (type === 'richtext') {
-      console.log(`Approval changed for ${id}:`, newApproved);
+      console.log(`Approval changed for ${id}:`, newApproved, fieldValue);
     }
     
+    // Process the existing fieldValue with the new approval status
     const processedValue = processFieldValue(fieldValue, field.type, needsApproval, newApproved);
     onChange(processedValue);
     
@@ -98,7 +103,7 @@ const BaseFieldWrapper = ({
       {childrenWithProps}
       
       {needsApproval && isFormCreator && (
-        <div className="mt-2 flex items-center">
+        <div className="mt-2 flex items-center bg-blue-50 p-2 rounded">
           <input
             type="checkbox"
             id={`${id}-approval`}
@@ -107,7 +112,7 @@ const BaseFieldWrapper = ({
             className="mr-2"
           />
           <label htmlFor={`${id}-approval`} className="text-sm text-gray-700">
-            Approve {isApproved ? '(Approved)' : '(Not Approved)'}
+            Approve Content for Viewing {isApproved ? '(Approved)' : '(Not Approved)'}
           </label>
         </div>
       )}
