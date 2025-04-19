@@ -14,6 +14,9 @@ router.post('/:id/responses', resolveTenant, responseController.submitResponse);
 // Protected routes (authentication required)
 router.get('/', authenticate, resolveTenant, formController.listForms);
 router.get('/:id/responses', authenticate, resolveTenant, responseController.listResponses);
+router.post('/:id/responses', validateForm, responseController.submitResponse);
+router.delete('/:id/responses/:responseId', authenticate, resolveTenant, formController.validateFormOwnership, responseController.deleteResponse);
+router.put('/:formId/responses/:responseId/fields/:fieldId/approval', authenticate, resolveTenant, formController.validateFormOwnership, responseController.updateResponseApproval);
 router.get('/:id/analytics', authenticate, resolveTenant, analyticsController.getFormAnalytics);
 
 module.exports = router;

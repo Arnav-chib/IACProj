@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getForm, getFormResponses, deleteFormResponse } from '../../services/formService';
+import { getForm, getFormResponses, deleteFormResponse, updateResponseApproval } from '../../services/formService';
+import { updateFieldApproval, formatFieldValue, isFieldApproved, parseFieldValue } from '../../services/responseService';
 import { toast } from 'react-toastify';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
@@ -14,8 +15,11 @@ const ResponseView = () => {
   const [error, setError] = useState(null);
   const [selectedResponse, setSelectedResponse] = useState(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingResponse, setDeletingResponse] = useState(null);
+  const [approvingResponse, setApprovingResponse] = useState(null);
+  const [fieldApprovals, setFieldApprovals] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,6 +48,32 @@ const ResponseView = () => {
     setSelectedResponse(response);
     setIsViewModalOpen(true);
   };
+  
+  const handleApproveClick = (response) => {
+    setApprovingResponse(response);
+    // Initialize field approvals based on current state
+    const initialApprovals = {};
+    form.fields.forEach(field => {
+      if (field.needsApproval) {
+        // Parse the field value to get current approval status
+        let isApproved = false;
+        try {
+          const value = response.values[field.id];
+          if (value && typeof value === 'object') {
+            isApproved = value.isApproved || false;
+          } else if (typeof value === 'string' && value.startsWith('{')) {
+            const parsed = JSON.parse(value);
+            isApproved = parsed.isApproved || false;
+          }
+        } catch (e) {
+          console.error('Error parsing field value:', e);
+        }
+        initialApprovals[field.id] = isApproved;
+      }
+    });
+    setFieldApprovals(initialApprovals);
+    setIsApproveModalOpen(true);
+  };
 
   const handleDeleteClick = (response) => {
     setDeletingResponse(response);
@@ -62,6 +92,55 @@ const ResponseView = () => {
       toast.error('Failed to delete response');
     }
   };
+  
+  const handleApprovalChange = (fieldId) => {
+    setFieldApprovals(prev => ({
+      ...prev,
+      [fieldId]: !prev[fieldId]
+    }));
+  };
+  
+  const handleApproveConfirm = async () => {
+    try {
+      // Update each field that needs approval
+      const updatePromises = Object.entries(fieldApprovals).map(([fieldId, isApproved]) => 
+        updateFieldApproval(formId, approvingResponse.id, fieldId, isApproved)
+      );
+      
+      await Promise.all(updatePromises);
+      
+      toast.success('Response approval status updated successfully');
+      setIsApproveModalOpen(false);
+      
+      // Refresh the responses to get updated data
+      const refreshedResponses = await getFormResponses(formId);
+      setResponses(refreshedResponses);
+    } catch (err) {
+      console.error('Error updating approval status:', err);
+      toast.error('Failed to update approval status');
+    }
+  };
+
+  // Function to check if a field is approved
+  const checkApprovalStatus = (field, value) => {
+    if (!field.needsApproval) return true;
+    
+    return isFieldApproved(value, field);
+  };
+
+  // Function to extract the actual value from a field that has approval status
+  const extractFieldValue = (value, fieldType) => {
+    const { value: extractedValue } = parseFieldValue(value, fieldType);
+    return extractedValue;
+  };
+
+  // Function to format response values based on field type
+  const formatValue = (field, value) => {
+    return formatFieldValue(value, field);
+  };
+  
+  // Check if the form has any fields that need approval
+  const hasApprovalFields = form.fields.some(field => field.needsApproval);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -114,24 +193,6 @@ const ResponseView = () => {
     );
   }
 
-  // Function to format response values based on field type
-  const formatValue = (value, fieldType) => {
-    if (value === null || value === undefined) return '-';
-    
-    try {
-      // Handle values that are stored as JSON strings
-      const parsedValue = typeof value === 'string' ? JSON.parse(value) : value;
-      
-      if (Array.isArray(parsedValue)) {
-        return parsedValue.join(', ');
-      }
-      
-      return parsedValue.toString();
-    } catch (e) {
-      return value.toString();
-    }
-  };
-
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -157,6 +218,7 @@ const ResponseView = () => {
                 {form.fields.map(field => (
                   <th key={field.id} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {field.name}
+                    {field.needsApproval && <span className="ml-1 text-xs text-blue-500">(Needs Approval)</span>}
                   </th>
                 ))}
                 <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -172,7 +234,16 @@ const ResponseView = () => {
                   </td>
                   {form.fields.map(field => (
                     <td key={`${response.id}-${field.id}`} className="px-6 py-4 text-sm text-gray-500">
-                      {formatValue(response.values[field.id], field.type)}
+                      {formatValue(field, response.values[field.id])}
+                      {field.needsApproval && (
+                        <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
+                          checkApprovalStatus(field, response.values[field.id]) 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {checkApprovalStatus(field, response.values[field.id]) ? 'Approved' : 'Pending'}
+                        </span>
+                      )}
                     </td>
                   ))}
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -182,6 +253,14 @@ const ResponseView = () => {
                     >
                       View
                     </button>
+                    {hasApprovalFields && (
+                      <button
+                        onClick={() => handleApproveClick(response)}
+                        className="text-green-600 hover:text-green-900 mr-4"
+                      >
+                        Approve
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDeleteClick(response)}
                       className="text-red-600 hover:text-red-900"
@@ -207,25 +286,54 @@ const ResponseView = () => {
             <h3 className="text-lg font-medium mb-4">Submitted on {new Date(selectedResponse.submittedAt).toLocaleString()}</h3>
             
             <div className="space-y-4">
-              {form.fields.map(field => (
-                <div key={field.id} className="border-b pb-2">
-                  <h4 className="font-medium text-gray-700">{field.name}</h4>
-                  <div className="mt-1">
-                    {field.type === 'file' ? (
-                      <a 
-                        href={selectedResponse.values[field.id]} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        View Uploaded File
-                      </a>
-                    ) : (
-                      <p>{formatValue(selectedResponse.values[field.id], field.type)}</p>
-                    )}
+              {form.fields.map(field => {
+                // Skip rendering fields that need approval but aren't approved
+                if (field.needsApproval && !checkApprovalStatus(field, selectedResponse.values[field.id])) {
+                  return null;
+                }
+                
+                // Extract the actual value
+                const displayValue = extractFieldValue(selectedResponse.values[field.id], field.type);
+                
+                return (
+                  <div key={field.id} className="border-b pb-2">
+                    <h4 className="font-medium text-gray-700">
+                      {field.name}
+                      {field.needsApproval && (
+                        <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Approved</span>
+                      )}
+                    </h4>
+                    <div className="mt-1">
+                      {field.type === 'file' ? (
+                        <a 
+                          href={displayValue} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          View Uploaded File
+                        </a>
+                      ) : field.type === 'richtext' ? (
+                        <div className="prose">
+                          {/* Render rich text content safely */}
+                          {(() => {
+                            try {
+                              if (displayValue && displayValue.content) {
+                                return <div dangerouslySetInnerHTML={{ __html: displayValue.content.blocks?.map(b => b.text).join('<br/>') || '' }} />;
+                              }
+                              return <p>{String(displayValue)}</p>;
+                            } catch (e) {
+                              return <p>{String(selectedResponse.values[field.id] || '')}</p>;
+                            }
+                          })()}
+                        </div>
+                      ) : (
+                        <p>{formatValue(field, selectedResponse.values[field.id])}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             
             <div className="mt-6 flex justify-end">
@@ -234,6 +342,56 @@ const ResponseView = () => {
                 variant="secondary"
               >
                 Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      
+      {/* Approve Response Modal */}
+      {isApproveModalOpen && approvingResponse && (
+        <Modal
+          title="Approve Response Fields"
+          isOpen={isApproveModalOpen}
+          onClose={() => setIsApproveModalOpen(false)}
+        >
+          <div className="p-4">
+            <h3 className="text-lg font-medium mb-4">Manage Approvals</h3>
+            
+            <div className="space-y-4">
+              {form.fields.filter(field => field.needsApproval).map(field => (
+                <div key={field.id} className="flex items-center justify-between p-2 border rounded">
+                  <div className="flex-1 mr-4">
+                    <span className="font-medium">{field.name}</span>
+                    <p className="text-sm text-gray-500">
+                      {formatValue(field, approvingResponse.values[field.id])}
+                    </p>
+                  </div>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={fieldApprovals[field.id] || false}
+                      onChange={() => handleApprovalChange(field.id)}
+                      className="form-checkbox h-5 w-5 text-blue-600"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Approve</span>
+                  </label>
+                </div>
+              ))}
+            </div>
+            
+            <div className="mt-6 flex justify-end space-x-2">
+              <Button 
+                onClick={() => setIsApproveModalOpen(false)}
+                variant="secondary"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleApproveConfirm}
+                variant="primary"
+              >
+                Save Approvals
               </Button>
             </div>
           </div>

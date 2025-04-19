@@ -9,6 +9,7 @@ import CheckboxInput from './fields/CheckboxInput';
 import SliderInput from './fields/SliderInput';
 import RichTextInput from './fields/RichTextInput';
 import FileInput from './fields/FileInput';
+import BaseFieldWrapper from './fields/BaseFieldWrapper';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
 
@@ -170,32 +171,60 @@ const FormRenderer = () => {
     }
   };
   
-  const renderField = (field) => {
-    const commonProps = {
-      id: field.id,
-      label: field.name,
-      value: formValues[field.id] || '',
-      onChange: (value) => handleFieldChange(field.id, value),
-      required: field.required,
-      error: errors[field.id],
-      formValues // Pass all form values for interdependent validation
+  const RenderField = ({ field, values, setValues, errors, disabled }) => {
+    const fieldId = field.id;
+    const isFormCreator = false; // Regular form submitter, not the creator
+    
+    const handleChange = (value) => {
+      setValues((prev) => ({
+        ...prev,
+        [fieldId]: value,
+      }));
     };
     
+    // Render the field component based on type
+    let fieldComponent;
     switch (field.type) {
       case 'text':
-        return <TextInput key={field.id} {...commonProps} />;
+        fieldComponent = (
+          <TextInput 
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
+            disabled={disabled}
+          />
+        );
+        break;
       
       case 'date':
-        return (
+        fieldComponent = (
           <DateInput
-            key={field.id}
-            {...commonProps}
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
             validation={field.validation}
           />
         );
+        break;
       
       case 'checkbox':
-        return <CheckboxInput key={field.id} {...commonProps} />;
+        fieldComponent = (
+          <CheckboxInput
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
+          />
+        );
+        break;
       
       case 'dropdown':
         let options = [];
@@ -211,7 +240,7 @@ const FormRenderer = () => {
             } else if (field.population.dependsOn && field.population.options) {
               // Handle dynamic options based on another field
               const dependentFieldId = field.population.dependsOn;
-              const dependentValue = formValues[dependentFieldId];
+              const dependentValue = values[dependentFieldId];
               
               if (dependentValue && field.population.options[dependentValue]) {
                 options = field.population.options[dependentValue].map(option => ({
@@ -225,55 +254,110 @@ const FormRenderer = () => {
           isMultiple = field.population.multiple === true;
         }
         
-        return (
+        fieldComponent = (
           <Dropdown
-            key={field.id}
-            {...commonProps}
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
             options={options}
             multiple={isMultiple}
           />
         );
+        break;
       
       case 'slider':
-        return (
+        fieldComponent = (
           <SliderInput
-            key={field.id}
-            {...commonProps}
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
             config={field.population}
           />
         );
+        break;
       
       case 'richtext':
-        return (
+        fieldComponent = (
           <RichTextInput
-            key={field.id}
-            {...commonProps}
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
             needsApproval={field.needsApproval}
+            isFormCreator={isFormCreator}
+            disabled={disabled}
           />
         );
+        break;
       
       case 'file':
-        return <FileInput key={field.id} {...commonProps} />;
+        fieldComponent = (
+          <FileInput
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
+          />
+        );
+        break;
       
       case 'group':
         // Find group definition
         const group = form.groups.find(g => g.id === field.groupId);
         if (!group) return null;
         
-        return (
+        fieldComponent = (
           <GroupField
-            key={field.id}
-            {...commonProps}
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
             columns={group.columns}
             columnConfig={JSON.parse(group.columnConfig)}
             rows={group.rows}
             canAddRows={group.canAddRows}
           />
         );
+        break;
       
       default:
-        return <TextInput key={field.id} {...commonProps} />;
+        fieldComponent = (
+          <TextInput 
+            id={fieldId}
+            label={field.name}
+            value={values[fieldId] || ''}
+            onChange={handleChange}
+            required={field.required}
+            error={errors[fieldId]}
+            disabled={disabled}
+          />
+        );
     }
+    
+    // Wrap with the BaseFieldWrapper for approval handling
+    return (
+      <BaseFieldWrapper
+        field={field}
+        value={values[fieldId]}
+        onChange={handleChange}
+        error={errors[fieldId]}
+        isFormCreator={isFormCreator}
+      >
+        {fieldComponent}
+      </BaseFieldWrapper>
+    );
   };
   
   if (loading) {
@@ -340,7 +424,16 @@ const FormRenderer = () => {
         {form.fields
           .filter(field => !field.groupId)
           .sort((a, b) => a.position - b.position)
-          .map(renderField)}
+          .map(field => (
+            <RenderField
+              key={field.id}
+              field={field}
+              values={formValues}
+              setValues={setFormValues}
+              errors={errors}
+              disabled={submitting}
+            />
+          ))}
         
         <div className="mt-6">
           <Button 

@@ -49,12 +49,9 @@ const BlogForm = () => {
 
   const fetchBlogPost = useCallback(async () => {
     try {
-      // For edit mode, we need to fetch the blog post first
-      // We need to make a special endpoint call to get it by ID instead of slug
-      // For now we'll use a workaround with existing endpoints
-      const response = await axios.get('/api/system/blog');
-      const posts = response.data.data;
-      const post = posts.find(p => p.ContentID === parseInt(id));
+      // Fetch the blog post directly by ID
+      const response = await axios.get(`/api/system/blog/${id}`);
+      const post = response.data.data;
       
       if (post) {
         setFormData({
@@ -124,14 +121,12 @@ const BlogForm = () => {
     try {
       console.log('Submitting blog post:', formData);
       
-      // Use the api object from services/api.js to ensure correct base URL and headers
       if (isEditMode) {
-        // Make sure we're using the correct endpoint format
+        // Fix the PUT endpoint - use contentId instead of id in the URL
         const response = await axios.put(`/api/system/blog/${id}`, formData);
         console.log('Blog update response:', response);
         toast.success('Blog post updated successfully');
       } else {
-        // Make sure we're using the correct endpoint format 
         const response = await axios.post('/api/system/blog', formData);
         console.log('Blog create response:', response);
         toast.success('Blog post created successfully');

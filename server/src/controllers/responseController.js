@@ -1,4 +1,5 @@
 const { submitFormResponse, getFormResponses } = require('../services/responseService');
+const sql = require('mssql');
 
 // Submit response
 async function submitResponse(req, res) {
@@ -39,7 +40,59 @@ async function listResponses(req, res) {
   }
 }
 
+// Update response field approval status
+async function updateResponseApproval(req, res) {
+  try {
+    const { formId, responseId, fieldId } = req.params;
+    const { isApproved } = req.body;
+    
+    // Update the approval status
+    await req.tenantDbConnection.request()
+      .input('responseId', sql.Int, parseInt(responseId))
+      .input('fieldId', sql.Int, parseInt(fieldId))
+      .input('isApproved', sql.Bit, isApproved)
+      .query(`
+        UPDATE ResponseDetails
+        SET IsApproved = @isApproved
+        WHERE ResponseID = @responseId AND FieldID = @fieldId
+      `);
+    
+    res.json({
+      message: 'Response approval status updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating response approval:', error);
+    res.status(500).json({ error: 'Failed to update approval status' });
+  }
+}
+
+// Delete a response
+async function deleteResponse(req, res) {
+  try {
+    const { responseId } = req.params;
+    
+    // First delete all response details
+    await req.tenantDbConnection.request()
+      .input('responseId', sql.Int, parseInt(responseId))
+      .query('DELETE FROM ResponseDetails WHERE ResponseID = @responseId');
+    
+    // Then delete the response itself
+    await req.tenantDbConnection.request()
+      .input('responseId', sql.Int, parseInt(responseId))
+      .query('DELETE FROM FormResponses WHERE ResponseID = @responseId');
+    
+    res.json({
+      message: 'Response deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting response:', error);
+    res.status(500).json({ error: 'Failed to delete response' });
+  }
+}
+
 module.exports = {
   submitResponse,
-  listResponses
+  listResponses,
+  updateResponseApproval,
+  deleteResponse
 };

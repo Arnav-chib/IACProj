@@ -96,6 +96,19 @@ export const deleteFormResponse = async (formId, responseId) => {
   }
 };
 
+// Update response field approval status
+export const updateResponseApproval = async (formId, responseId, fieldId, isApproved) => {
+  console.log(`Updating approval status for field ${fieldId} in response ${responseId}...`);
+  try {
+    const response = await api.put(`/forms/${formId}/responses/${responseId}/fields/${fieldId}/approval`, { isApproved });
+    console.log('Update approval result:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating approval status for field ${fieldId}:`, error);
+    throw error;
+  }
+};
+
 // Get form analytics
 export const getFormAnalytics = async (formId) => {
   try {
