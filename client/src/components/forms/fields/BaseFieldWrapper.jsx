@@ -18,7 +18,7 @@ const BaseFieldWrapper = ({
   isFormCreator,
   children,
 }) => {
-  const { id, name, needsApproval } = field;
+  const { id, name, needsApproval, type } = field;
   
   // If the field doesn't need approval, just render the children
   if (!needsApproval) {
@@ -32,26 +32,55 @@ const BaseFieldWrapper = ({
   // When the value changes externally, update our internal state
   useEffect(() => {
     if (value !== undefined) {
+      // Log value for debugging
+      if (type === 'richtext') {
+        console.log(`Processing richtext field ${id}:`, value);
+      }
+      
       const { value: extractedValue, isApproved: extractedApproval } = parseFieldValue(value, field.type);
       setFieldValue(extractedValue);
       setIsApproved(extractedApproval);
+      
+      if (type === 'richtext') {
+        console.log(`Extracted values for ${id}:`, { extractedValue, extractedApproval });
+      }
     }
-  }, [value, field.type]);
+  }, [value, field.type, id, type]);
   
   // When the internal field value changes, propagate it up with approval status
-  const handleFieldChange = (newValue) => {
+  const handleFieldChange = (newValue, event) => {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+    
     setFieldValue(newValue);
     const processedValue = processFieldValue(newValue, field.type, needsApproval, isApproved);
-    onChange(processedValue);
+    onChange(processedValue, event);
+    
+    // Restore scroll position
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition);
+    }, 0);
   };
   
   // When approval status changes, update the value
   const handleApprovalChange = (e) => {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+    
     const newApproved = e.target.checked;
     setIsApproved(newApproved);
     
+    if (type === 'richtext') {
+      console.log(`Approval changed for ${id}:`, newApproved);
+    }
+    
     const processedValue = processFieldValue(fieldValue, field.type, needsApproval, newApproved);
     onChange(processedValue);
+    
+    // Restore scroll position
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition);
+    }, 0);
   };
   
   // Clone the children with new props
@@ -59,6 +88,9 @@ const BaseFieldWrapper = ({
     value: fieldValue,
     onChange: handleFieldChange,
     error,
+    needsApproval,
+    isApproved,
+    isFormCreator
   });
   
   return (
@@ -75,7 +107,7 @@ const BaseFieldWrapper = ({
             className="mr-2"
           />
           <label htmlFor={`${id}-approval`} className="text-sm text-gray-700">
-            Approve
+            Approve {isApproved ? '(Approved)' : '(Not Approved)'}
           </label>
         </div>
       )}

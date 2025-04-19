@@ -64,6 +64,9 @@ const FormRenderer = () => {
   }, [formId]);
   
   const handleFieldChange = (fieldId, value, event) => {
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
+    
     // Prevent form submission and page scroll
     if (event && event.preventDefault) {
       event.preventDefault();
@@ -82,6 +85,11 @@ const FormRenderer = () => {
         return newErrors;
       });
     }
+    
+    // Restore scroll position
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition);
+    }, 0);
   };
   
   const validateForm = () => {

@@ -10,11 +10,15 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
       try {
         // Try to parse as raw content
         const parsedValue = JSON.parse(value);
-        if (parsedValue.content) {
+        // Handle the case where value is wrapped with approval status
+        if (parsedValue.value && parsedValue.value.content) {
+          return EditorState.createWithContent(convertFromRaw(parsedValue.value.content));
+        } else if (parsedValue.content) {
           return EditorState.createWithContent(convertFromRaw(parsedValue.content));
         }
         return EditorState.createWithContent(convertFromRaw(parsedValue));
       } catch (e) {
+        console.error('Error parsing rich text content:', e);
         // If parsing fails, use as plain text
         return EditorState.createWithContent(ContentState.createFromText(value));
       }
@@ -35,6 +39,8 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
         const parsedValue = JSON.parse(value);
         if (parsedValue.isApproved !== undefined) {
           setIsApproved(parsedValue.isApproved);
+        } else if (parsedValue.value && parsedValue.value.isApproved !== undefined) {
+          setIsApproved(parsedValue.value.isApproved);
         }
       } catch (e) {
         console.error('Error parsing isApproved from value:', e);
@@ -69,24 +75,35 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
     onChange(JSON.stringify(newValue));
   };
 
+  // Check if field should be displayed (either not requiring approval or approved)
+  const shouldShowContent = !needsApproval || isApproved || isFormCreator;
+
   return (
     <div className="mb-4">
       <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor={id}>
         {label} {required && <span className="text-red-500">*</span>}
         {needsApproval && <span className="text-blue-500 ml-1">(Requires Approval)</span>}
+        {needsApproval && !isApproved && !isFormCreator && <span className="text-orange-500 ml-1">(Pending Approval)</span>}
       </label>
       
-      <div className="border rounded p-2 bg-white">
-        <Editor
-          editorState={editorState}
-          onEditorStateChange={handleEditorChange}
-          wrapperClassName="rich-text-wrapper"
-          editorClassName="rich-text-editor min-h-[200px]"
-          toolbar={{
-            options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'link', 'image', 'remove', 'history'],
-          }}
-        />
-      </div>
+      {shouldShowContent ? (
+        <div className="border rounded p-2 bg-white">
+          <Editor
+            editorState={editorState}
+            onEditorStateChange={handleEditorChange}
+            wrapperClassName="rich-text-wrapper"
+            editorClassName="rich-text-editor min-h-[200px]"
+            toolbar={{
+              options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'link', 'image', 'remove', 'history'],
+            }}
+            readOnly={needsApproval && !isFormCreator && !isApproved}
+          />
+        </div>
+      ) : (
+        <div className="border rounded p-2 bg-gray-100 text-gray-500 min-h-[200px] flex items-center justify-center">
+          <p>Content pending approval</p>
+        </div>
+      )}
       
       {error && <p className="text-red-500 text-xs italic mt-1">{error}</p>}
       

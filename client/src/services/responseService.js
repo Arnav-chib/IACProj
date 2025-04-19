@@ -32,10 +32,18 @@ export const parseFieldValue = (value, fieldType) => {
     if (typeof value === 'string' && value.startsWith('{')) {
       const parsed = JSON.parse(value);
       
-      // If it has approval status
+      // If it has approval status directly
       if (parsed.isApproved !== undefined) {
+        // Special case for rich text
+        if (fieldType === 'richtext' && parsed.content) {
+          return {
+            value: parsed,
+            isApproved: parsed.isApproved || false
+          };
+        }
+        
         return {
-          value: parsed.value,
+          value: parsed.value !== undefined ? parsed.value : parsed,
           isApproved: parsed.isApproved
         };
       }
@@ -55,7 +63,7 @@ export const parseFieldValue = (value, fieldType) => {
       isApproved: false
     };
   } catch (e) {
-    console.error('Error parsing field value:', e);
+    console.error('Error parsing field value:', e, value, fieldType);
     return {
       value,
       isApproved: false
@@ -75,12 +83,18 @@ export const formatFieldValue = (value, field) => {
   }
   
   // Extract the actual value if it's wrapped with approval status
-  const { value: extractedValue } = parseFieldValue(value, field.type);
+  const { value: extractedValue, isApproved } = parseFieldValue(value, field.type);
+  
+  // If field needs approval and is not approved, don't show content
+  if (field.needsApproval && !isApproved) {
+    return 'Content pending approval';
+  }
   
   try {
     // Handle values based on field type
     switch (field.type) {
       case 'richtext':
+        // For richtext, we just show a placeholder. The actual rendering is done by the component.
         return 'Rich text content';
         
       case 'dropdown':
