@@ -38,7 +38,12 @@ const FormRenderer = () => {
         // Initialize form values
         const initialValues = {};
         formData.fields.forEach(field => {
-          initialValues[field.id] = '';
+          // Initialize multiple select fields with empty arrays
+          if (field.type === 'dropdown' && field.population && field.population.multiple) {
+            initialValues[field.id] = [];
+          } else {
+            initialValues[field.id] = '';
+          }
         });
         setFormValues(initialValues);
       } catch (error) {
@@ -58,7 +63,12 @@ const FormRenderer = () => {
     loadForm();
   }, [formId]);
   
-  const handleFieldChange = (fieldId, value) => {
+  const handleFieldChange = (fieldId, value, event) => {
+    // Prevent form submission and page scroll
+    if (event && event.preventDefault) {
+      event.preventDefault();
+    }
+    
     setFormValues(prev => ({
       ...prev,
       [fieldId]: value
@@ -175,11 +185,11 @@ const FormRenderer = () => {
     const fieldId = field.id;
     const isFormCreator = false; // Regular form submitter, not the creator
     
-    const handleChange = (value) => {
+    const handleChange = (value, event) => {
       setValues((prev) => ({
         ...prev,
         [fieldId]: value,
-      }));
+      }), event);
     };
     
     // Render the field component based on type

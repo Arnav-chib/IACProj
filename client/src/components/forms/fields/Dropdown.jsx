@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 const Dropdown = ({ 
   id, 
@@ -11,12 +11,26 @@ const Dropdown = ({
   multiple = false,
   placeholder = 'Select...'
 }) => {
+  // Ensure value is always an array for multiple select
+  const [internalValue, setInternalValue] = useState(multiple ? (Array.isArray(value) ? value : []) : value);
+  
+  // Update internal value when prop changes
+  useEffect(() => {
+    if (multiple) {
+      setInternalValue(Array.isArray(value) ? value : []);
+    } else {
+      setInternalValue(value);
+    }
+  }, [value, multiple]);
+
   const handleChange = (e) => {
     if (multiple) {
       // For multi-select, create an array of selected values
       const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+      setInternalValue(selectedOptions);
       onChange(selectedOptions);
     } else {
+      setInternalValue(e.target.value);
       onChange(e.target.value);
     }
   };
@@ -32,7 +46,7 @@ const Dropdown = ({
       </label>
       <select
         id={id}
-        value={value}
+        value={internalValue}
         onChange={handleChange}
         required={required}
         multiple={multiple}

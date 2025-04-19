@@ -47,10 +47,14 @@ async function submitFormResponse(formId, responseData, tenantDb) {
 // Get form responses
 async function getFormResponses(formId, tenantDb) {
   try {
+    console.log(`Getting responses for form ID: ${formId}`);
+    
     // Get form details first to verify form exists
     const formResult = await tenantDb.request()
       .input('formId', sql.Int, formId)
       .query('SELECT * FROM FormMaster WHERE ID = @formId');
+    
+    console.log(`Form query result: Found ${formResult.recordset.length} records`);
     
     if (formResult.recordset.length === 0) {
       throw new Error('Form not found');
@@ -66,10 +70,14 @@ async function getFormResponses(formId, tenantDb) {
         ORDER BY SubmittedAt DESC
       `);
     
+    console.log(`Response query result: Found ${responsesResult.recordset.length} responses`);
+    
     const responses = [];
     
     // For each response, get the field values
     for (const response of responsesResult.recordset) {
+      console.log(`Processing response ID: ${response.ResponseID}`);
+      
       const detailsResult = await tenantDb.request()
         .input('responseId', sql.Int, response.ResponseID)
         .query(`
@@ -78,6 +86,8 @@ async function getFormResponses(formId, tenantDb) {
           JOIN FormDetails fd ON rd.FieldID = fd.ID
           WHERE rd.ResponseID = @responseId
         `);
+      
+      console.log(`Response details: Found ${detailsResult.recordset.length} field values`);
       
       const formattedResponse = {
         id: response.ResponseID,
@@ -88,12 +98,19 @@ async function getFormResponses(formId, tenantDb) {
       
       // Format the values
       detailsResult.recordset.forEach(detail => {
-        formattedResponse.values[detail.FieldID] = detail.Value ? JSON.parse(detail.Value) : null;
+        try {
+          formattedResponse.values[detail.FieldID] = detail.Value ? JSON.parse(detail.Value) : null;
+        } catch (err) {
+          console.error(`Error parsing value for field ${detail.FieldID}:`, err);
+          // Use the raw value as fallback
+          formattedResponse.values[detail.FieldID] = detail.Value;
+        }
       });
       
       responses.push(formattedResponse);
     }
     
+    console.log(`Returning ${responses.length} formatted responses`);
     return responses;
   } catch (error) {
     console.error('Error getting form responses:', error);

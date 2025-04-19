@@ -88,8 +88,31 @@ export const getFormResponses = async (formId) => {
   console.log(`Fetching responses for form ${formId}...`);
   try {
     const response = await api.get(`/forms/${formId}/responses`);
-    console.log('Form responses:', response.data);
-    return response.data.responses || response.data.data || [];
+    console.log('Form responses raw API response:', response);
+    
+    // Try to extract responses from various possible response formats
+    let extractedResponses;
+    
+    if (response.data?.responses) {
+      // Format: { responses: [...] }
+      extractedResponses = response.data.responses;
+    } else if (response.data?.data?.responses) {
+      // Format: { data: { responses: [...] } }
+      extractedResponses = response.data.data.responses;
+    } else if (Array.isArray(response.data?.data)) {
+      // Format: { data: [...] }
+      extractedResponses = response.data.data;
+    } else if (Array.isArray(response.data)) {
+      // Format: [...]
+      extractedResponses = response.data;
+    } else {
+      // Default to empty array if no recognizable format
+      console.warn('Response format not recognized:', response.data);
+      extractedResponses = [];
+    }
+    
+    console.log('Extracted responses:', extractedResponses);
+    return extractedResponses;
   } catch (error) {
     console.error(`Error fetching responses for form ${formId}:`, error);
     throw error;

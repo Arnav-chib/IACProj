@@ -27,17 +27,26 @@ const ResponseView = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        console.log('ResponseView: Fetching form and responses for formId:', formId);
         // Fetch form and responses in parallel
         const [formData, responseData] = await Promise.all([
           getForm(formId),
           getFormResponses(formId)
         ]);
         
+        console.log('ResponseView: Response data received:', responseData);
+        console.log('ResponseView: Form data received:', formData);
+        
         // Only update state if component is still mounted
         if (isMounted) {
           setForm(formData);
           // Ensure responseData is always an array
-          setResponses(Array.isArray(responseData) ? responseData : []);
+          const processedResponses = Array.isArray(responseData) ? responseData : 
+                         (responseData?.responses ? responseData.responses : 
+                          (responseData?.data ? responseData.data : []));
+          
+          console.log('ResponseView: Setting processed responses:', processedResponses);
+          setResponses(processedResponses);
           setLoading(false);
         }
       } catch (err) {
