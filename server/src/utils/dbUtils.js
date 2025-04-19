@@ -21,6 +21,24 @@ async function initializeMasterDb(pool) {
     // If the table exists, we assume the schema is initialized
     if (tableResult.recordset[0].count > 0) {
       logger.info('Master database schema already exists');
+      
+      // Verify admin user exists
+      const adminCheck = await pool.request().query(`
+        SELECT COUNT(*) as count FROM Users WHERE Email = 'admin@gmail.com'
+      `);
+      
+      if (adminCheck.recordset[0].count === 0) {
+        // Create admin user if it doesn't exist
+        const hashedPassword = '$2b$10$RzNvbW5I7qqvGPNKPfduweK6dKdSfqP8YBNL5M8aK4IbXJbX3PhBC'; // admin123
+        
+        await pool.request().query(`
+          INSERT INTO Users (Email, PasswordHash, FirstName, LastName, Role, IsSystemAdmin)
+          VALUES ('admin@gmail.com', '${hashedPassword}', 'Admin', 'User', 'admin', 1)
+        `);
+        
+        logger.logToConsole('Admin user created during initialization check');
+      }
+      
       return;
     }
     
@@ -32,15 +50,20 @@ async function initializeMasterDb(pool) {
       CREATE TABLE Users (
         UserID INT PRIMARY KEY IDENTITY(1,1),
         Email NVARCHAR(255) NOT NULL UNIQUE,
+        Username NVARCHAR(100),
         PasswordHash NVARCHAR(255) NOT NULL,
         FirstName NVARCHAR(100),
         LastName NVARCHAR(100),
         Role NVARCHAR(50) NOT NULL DEFAULT 'user',
-        Status NVARCHAR(50) NOT NULL DEFAULT 'active',
+        IsSystemAdmin BIT NOT NULL DEFAULT 0,
+        IsOrgAdmin BIT NOT NULL DEFAULT 0,
+        OrgID INT NULL,
+        SubscriptionStatus NVARCHAR(50) DEFAULT 'active',
+        DBConnectionString NVARCHAR(MAX) NULL,
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE(),
-        ResetToken NVARCHAR(255),
-        ResetTokenExpires DATETIME
+        ResetPasswordToken NVARCHAR(255),
+        ResetPasswordExpires DATETIME
       )
     `);
     
@@ -48,11 +71,11 @@ async function initializeMasterDb(pool) {
     const hashedPassword = '$2b$10$RzNvbW5I7qqvGPNKPfduweK6dKdSfqP8YBNL5M8aK4IbXJbX3PhBC'; // admin123
     
     await pool.request().query(`
-      INSERT INTO Users (Email, PasswordHash, FirstName, LastName, Role)
-      VALUES ('admin@gmail.com', '${hashedPassword}', 'Admin', 'User', 'admin')
+      INSERT INTO Users (Email, Username, PasswordHash, FirstName, LastName, Role, IsSystemAdmin)
+      VALUES ('admin@gmail.com', 'admin', '${hashedPassword}', 'Admin', 'User', 'admin', 1)
     `);
     
-    logger.info('Master database schema initialized successfully');
+    logger.logToConsole('Master database schema initialized with admin user');
   } catch (error) {
     logger.error('Error initializing master database:', { 
       error: error.message,

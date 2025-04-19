@@ -1,5 +1,4 @@
 const { createUser, getUserByEmail, getPool } = require('../../models/userModel');
-const { generateTenantDatabaseName, createTenantDatabase } = require('../../utils/dbUtils');
 const logger = require('../../utils/logger');
 
 async function seedMasterUser() {
@@ -21,43 +20,47 @@ async function seedMasterUser() {
       role: 'admin',
       isSystemAdmin: true,
       subscriptionStatus: 'active',
-      // Initially no connection string - will be set after creation
     };
 
     // Create master user
     const user = await createUser(masterUser);
     logger.info('Master user created successfully', { userId: user.UserID });
     
-    // Now create a tenant database for this user
+    // For master user, create a schema in the master database
     try {
       // Get the database pool
       const pool = getPool();
       
-      // Generate a unique database name for this user
-      const dbName = generateTenantDatabaseName('User', user.UserID);
+      // Create a schema for this user in the master database
+      const schemaName = `User_${user.UserID}_Schema`;
       
-      // Create a new database for this user and get the connection string
-      const connectionString = await createTenantDatabase(pool, dbName);
+      // Create schema if it doesn't exist
+      await pool.request().query(`
+        IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '${schemaName}')
+        BEGIN
+          EXEC('CREATE SCHEMA [${schemaName}]')
+        END
+      `);
       
-      // Update the user with the connection string
+      // Update the user record with the schema information
       await pool.request()
         .input('userId', user.UserID)
-        .input('dbConnectionString', connectionString)
+        .input('schemaInfo', JSON.stringify({ schemaName, isMasterSchema: true }))
         .query(`
           UPDATE Users 
-          SET DBConnectionString = @dbConnectionString
+          SET DBConnectionString = @schemaInfo
           WHERE UserID = @userId
         `);
       
-      logger.info(`Created new tenant database for admin user: ${user.UserID}, database: ${dbName}`);
+      logger.logToConsole(`Created schema for admin user: ${user.UserID}, schema: ${schemaName}`);
     } catch (dbError) {
-      logger.error('Error creating tenant database for admin user:', {
+      logger.error('Error creating schema for admin user:', {
         error: dbError.message,
         stack: dbError.stack,
         userId: user.UserID
       });
       // Don't rethrow - we still want to consider the seeding successful
-      // even if the tenant db creation failed
+      // even if the schema creation failed
     }
   } catch (error) {
     logger.error('Error seeding master user:', {

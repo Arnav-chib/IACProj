@@ -11,12 +11,15 @@ if (!fs.existsSync(logsDir)) {
 // Define log format
 const logFormat = winston.format.combine(
   winston.format.timestamp(),
-  winston.format.json()
+  winston.format.printf(({ level, message, timestamp, ...rest }) => {
+    const restString = Object.keys(rest).length ? JSON.stringify(rest, null, 2) : '';
+    return `${timestamp} ${level.toUpperCase()}: ${message} ${restString}`;
+  })
 );
 
 // Create logger instance
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: 'debug', // Set to debug to capture more logs
   format: logFormat,
   transports: [
     // Console transport for all environments
@@ -37,5 +40,11 @@ const logger = winston.createLogger({
     })
   ]
 });
+
+// Explicitly log to console for critical operations
+logger.logToConsole = (message, meta = {}) => {
+  console.log(`LOG: ${message}`, meta);
+  logger.info(message, meta);
+};
 
 module.exports = logger; 
