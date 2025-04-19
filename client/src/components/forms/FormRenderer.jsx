@@ -20,6 +20,7 @@ const FormRenderer = () => {
   const [formValues, setFormValues] = useState({});
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
+  const [networkError, setNetworkError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   
@@ -27,7 +28,10 @@ const FormRenderer = () => {
     const loadForm = async () => {
       try {
         setLoading(true);
+        setNetworkError(null);
+        console.log(`FormRenderer: Loading form ${formId}`);
         const formData = await getForm(formId);
+        console.log('FormRenderer: Form loaded successfully', formData);
         setForm(formData);
         
         // Initialize form values
@@ -37,7 +41,14 @@ const FormRenderer = () => {
         });
         setFormValues(initialValues);
       } catch (error) {
-        console.error('Error loading form:', error);
+        console.error(`FormRenderer: Error loading form ${formId}:`, error);
+        if (error.message?.includes('Network Error') || error.code === 'ERR_NETWORK') {
+          setNetworkError('Unable to connect to the server. Please check your internet connection.');
+        } else if (error.response?.status === 404) {
+          setNetworkError('Form not found. It may have been deleted or moved.');
+        } else {
+          setNetworkError(`Error loading form: ${error.message || 'Unknown error'}`);
+        }
       } finally {
         setLoading(false);
       }
@@ -131,6 +142,7 @@ const FormRenderer = () => {
     
     try {
       setSubmitting(true);
+      setNetworkError(null);
       
       // Preprocess form data (e.g., handle file uploads)
       const processedValues = preprocessFormData();
@@ -142,7 +154,17 @@ const FormRenderer = () => {
       setSubmitted(true);
     } catch (error) {
       console.error('Error submitting form:', error);
-      setErrors({ form: 'Failed to submit form. Please try again.' });
+      
+      if (error.message?.includes('Network Error') || error.code === 'ERR_NETWORK') {
+        setNetworkError('Unable to connect to the server. Please check your internet connection and try again.');
+      } else {
+        setNetworkError(`Failed to submit form: ${error.message || 'Unknown error'}`);
+      }
+      
+      setErrors(prev => ({
+        ...prev,
+        form: 'Failed to submit form. Please try again.'
+      }));
     } finally {
       setSubmitting(false);
     }
@@ -256,6 +278,23 @@ const FormRenderer = () => {
   
   if (loading) {
     return <div className="flex justify-center p-8"><LoadingSpinner /></div>;
+  }
+  
+  if (networkError) {
+    return (
+      <div className="max-w-2xl mx-auto p-8 bg-white shadow-md rounded-lg">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" role="alert">
+          <p className="font-bold">Error</p>
+          <p>{networkError}</p>
+        </div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Try Again
+        </button>
+      </div>
+    );
   }
   
   if (!form) {

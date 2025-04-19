@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import { handleApiError } from '../utils/errorHandler';
 
-// Create axios instance with default config
+// Configure default axios instance
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || '/api',
   timeout: 10000,
@@ -13,42 +14,40 @@ const api = axios.create({
 // Add debugging to see what URL is being used
 console.log('API Base URL:', api.defaults.baseURL);
 
-// Request interceptor for adding auth token
+// Request interceptor to add auth token
 api.interceptors.request.use(
-  (config) => {
+  config => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
+      console.log('Adding auth token to request:', token.substring(0, 15) + '...');
     }
     console.log(`Making ${config.method.toUpperCase()} request to: ${config.baseURL}${config.url}`);
     return config;
   },
-  (error) => {
+  error => {
+    console.error('API request error:', error);
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for global error handling
+// Response interceptor for error handling
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    console.error('API Error:', error.message);
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Data:', error.response.data);
-    }
-    
-    // Handle unauthorized errors (token expired)
+  response => response,
+  error => {
+    console.error('API response error:', error);
+    // Handle auth errors
     if (error.response && error.response.status === 401) {
-      // Clear token if it's expired
-      const currentPath = window.location.pathname;
-      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/forgot-password') {
-        localStorage.removeItem('token');
+      console.log('Auth error detected, clearing token');
+      localStorage.removeItem('token');
+      // Avoid redirect loops
+      if (!window.location.pathname.includes('/login')) {
+        toast.error('Session expired. Please log in again.');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 1000);
       }
     }
-
     return Promise.reject(error);
   }
 );

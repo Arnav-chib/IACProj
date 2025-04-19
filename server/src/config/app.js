@@ -65,11 +65,25 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
+    
+    // Allow all origins for public form routes
+    if (origin.includes('/forms/') || origin.includes('/embed/')) {
+      return callback(null, true);
+    }
+    
+    // Check against allowed origins for other routes
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // Log blocked origins but allow them in development
+      console.warn(`CORS blocked request from origin: ${origin}`);
+      if (process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],

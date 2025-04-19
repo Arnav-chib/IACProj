@@ -9,15 +9,15 @@ const AboutUs = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     fetchAboutUs();
     
-    // Debugging logs
-    console.log('Current user:', user);
-    console.log('Is system admin?', user?.isSystemAdmin);
-  }, []);
+    // Debugging logs with safe access
+    console.log('Current user:', currentUser || 'Not authenticated');
+    console.log('Is system admin?', currentUser?.isSystemAdmin || false);
+  }, [currentUser]); // Add currentUser as dependency
 
   const fetchAboutUs = async () => {
     try {
@@ -54,7 +54,7 @@ const AboutUs = () => {
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">About Us</h1>
-        {user?.isSystemAdmin && (
+        {currentUser?.isSystemAdmin && (
           <button
             onClick={() => setIsEditing(!isEditing)}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -104,12 +104,10 @@ const AboutUs = () => {
           </button>
         </div>
       ) : (
-        !error && (
-          <div 
-            className="prose max-w-none"
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
-        )
+        <div 
+          className="prose max-w-none"
+          dangerouslySetInnerHTML={{ __html: content }}
+        />
       )}
     </div>
   );

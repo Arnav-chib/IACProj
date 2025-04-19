@@ -2,132 +2,111 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
-import apiService, { api } from '../../services/api';
+import { api } from '../../services/api';
 
 const BlogList = () => {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const { user } = useAuth();
+  const { currentUser } = useAuth();
 
   useEffect(() => {
-    fetchBlogPosts();
-  }, []);
-
-  const fetchBlogPosts = async () => {
-    try {
-      console.log('Fetching blog posts...');
-      const response = await api.get('/system/blog');
-      console.log('Blog posts response:', response.data);
-      setPosts(response.data.data || []);
-      setIsLoading(false);
-      setError(null);
-    } catch (error) {
-      console.error('Error fetching blog posts:', error);
-      setError('Failed to load blog posts. Please try again.');
-      toast.error('Failed to load blog posts');
-      setIsLoading(false);
-    }
-  };
-
-  const handleDelete = async (contentId) => {
-    if (window.confirm('Are you sure you want to delete this blog post?')) {
+    const fetchBlogPosts = async () => {
       try {
-        await api.delete(`/system/blog/${contentId}`);
-        toast.success('Blog post deleted successfully');
-        fetchBlogPosts();
+        console.log('Fetching blog posts...');
+        const response = await api.get('/system/blog');
+        console.log('Blog posts response:', response.data);
+        setPosts(response.data.data || []);
+        setIsLoading(false);
       } catch (error) {
-        console.error('Error deleting blog post:', error);
-        toast.error('Failed to delete blog post');
+        console.error('Error fetching blog posts:', error);
+        toast.error('Failed to load blog posts');
+        setIsLoading(false);
       }
-    }
-  };
+    };
+
+    fetchBlogPosts();
+    
+    // Debugging logs with safe access
+    console.log('Current user in BlogList:', currentUser || 'Not authenticated');
+    console.log('Is system admin in BlogList?', currentUser?.isSystemAdmin || false);
+  }, [currentUser]);
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown date';
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const getExcerpt = (content, maxLength = 150) => {
+    // Strip HTML tags and get plain text
+    const plainText = content.replace(/<[^>]+>/g, '');
+    if (plainText.length <= maxLength) return plainText;
+    return plainText.substring(0, maxLength) + '...';
   };
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
 
+  if (posts.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Blog</h1>
+          {currentUser?.isSystemAdmin && (
+            <Link
+              to="/blog/new"
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Create Post
+            </Link>
+          )}
+        </div>
+        <div className="text-center py-10">
+          <h2 className="text-xl font-medium text-gray-900">No blog posts yet</h2>
+          <p className="mt-2 text-gray-600">Check back later for updates.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Blog</h1>
-        {user?.isSystemAdmin && (
+        {currentUser?.isSystemAdmin && (
           <Link
             to="/blog/new"
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            New Post
+            Create Post
           </Link>
         )}
       </div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-          <button 
-            onClick={fetchBlogPosts} 
-            className="ml-2 underline"
-          >
-            Try Again
-          </button>
-        </div>
-      )}
-
-      {!error && posts.length === 0 ? (
-        <p className="text-center text-gray-600 my-12">No blog posts found</p>
-      ) : (
-        <div className="space-y-8">
-          {posts.map((post) => (
-            <div key={post.ContentID} className="border-b pb-6 last:border-0">
-              <Link to={`/blog/${post.Slug}`}>
-                <h2 className="text-2xl font-semibold hover:text-blue-600 transition-colors">
-                  {post.Title}
-                </h2>
+      <div className="space-y-8">
+        {posts.map(post => (
+          <article key={post.ContentID} className="border-b border-gray-200 pb-8 mb-8 last:border-0">
+            <h2 className="text-2xl font-bold mb-2">
+              <Link to={`/blog/${post.Slug}`} className="text-gray-900 hover:text-blue-600">
+                {post.Title}
               </Link>
-              <div className="flex items-center text-sm text-gray-500 mt-2">
-                <span>{post.AuthorName}</span>
-                <span className="mx-2">•</span>
-                <span>{formatDate(post.PublishedAt)}</span>
-              </div>
-              <div className="mt-3">
-                <p className="text-gray-600">
-                  {post.Content.replace(/<[^>]*>/g, '').substring(0, 200)}...
-                </p>
-              </div>
-              <div className="mt-4 flex">
-                <Link 
-                  to={`/blog/${post.Slug}`}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  Read more →
-                </Link>
-                
-                {user?.isSystemAdmin && (
-                  <div className="ml-auto space-x-3">
-                    <Link 
-                      to={`/blog/edit/${post.ContentID}`}
-                      className="text-gray-600 hover:text-gray-800"
-                    >
-                      Edit
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(post.ContentID)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
+            </h2>
+            <div className="text-sm text-gray-600 mb-4">
+              Published on {formatDate(post.PublishedAt || post.CreatedAt)}
             </div>
-          ))}
-        </div>
-      )}
+            <p className="text-gray-700 mb-4">
+              {getExcerpt(post.Content)}
+            </p>
+            <Link
+              to={`/blog/${post.Slug}`}
+              className="text-blue-600 hover:text-blue-800"
+            >
+              Read More →
+            </Link>
+          </article>
+        ))}
+      </div>
     </div>
   );
 };
