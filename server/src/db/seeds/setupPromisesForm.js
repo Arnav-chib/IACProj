@@ -39,6 +39,7 @@ async function setupPromisesForm() {
         ? JSON.parse(adminUser.DBConnectionString) 
         : adminUser.DBConnectionString;
     } catch (e) {
+      logger.error('Error parsing connection string:', e);
       connectionInfo = adminUser.DBConnectionString;
     }
     
@@ -51,21 +52,63 @@ async function setupPromisesForm() {
     const schemaPath = path.join(__dirname, '../../../db/promises_form_schema.sql');
     const schemaScript = fs.readFileSync(schemaPath, 'utf8');
     
-    // If we have a schema, modify the script to use fully qualified table names
-    let finalScript = schemaScript;
+    // If we have a schema, prepare the SQL properly for execution in the schema context
     if (connectionInfo && connectionInfo.schema) {
-      // Make each table create statement use the schema prefix
       const schema = connectionInfo.schema;
+      logger.info(`Using schema: ${schema} for Political Promises form`);
       
-      // Modify the INSERT statements to include schema
-      finalScript = schemaScript
-        .replace(/INSERT INTO ([^\s]+)/g, `INSERT INTO ${schema}.$1`)
-        .replace(/FROM ([^\s]+)/g, `FROM ${schema}.$1`)
-        .replace(/REFERENCES ([^\s]+)/g, `REFERENCES ${schema}.$1`);
+      // First check if FormMaster exists in the schema
+      const tableCheck = await tenantPool.request().query(`
+        SELECT COUNT(*) AS count 
+        FROM INFORMATION_SCHEMA.TABLES 
+        WHERE TABLE_SCHEMA = '${schema}' AND TABLE_NAME = 'FormMaster'
+      `);
+      
+      if (tableCheck.recordset[0].count === 0) {
+        logger.error(`Table FormMaster not found in schema ${schema}! Please ensure tenant tables are created first.`);
+        process.exit(1);
+      }
+      
+      // Prepare the modified script with schema prefixes
+      let modifiedScript = schemaScript
+        .replace(/INTO\s+([^\s(]+)/g, `INTO ${schema}.$1`)
+        .replace(/FROM\s+([^\s(]+)/g, `FROM ${schema}.$1`)
+        .replace(/UPDATE\s+([^\s(]+)/g, `UPDATE ${schema}.$1`)
+        .replace(/REFERENCES\s+([^\s(]+)/g, `REFERENCES ${schema}.$1`)
+        .replace(/FormMaster/g, `${schema}.FormMaster`)
+        .replace(/FormDetails/g, `${schema}.FormDetails`)
+        .replace(/GroupDetails/g, `${schema}.GroupDetails`);
+      
+      // Fix duplicate schema prefixes if they occur
+      const doubleSchemaPattern = `${schema}.${schema}.`;
+      modifiedScript = modifiedScript.replace(new RegExp(doubleSchemaPattern, 'g'), `${schema}.`);
+      
+      // Execute the script with schema context
+      await tenantPool.request().batch(`
+        -- Set the schema context
+        USE [${connectionInfo.database}];
+        
+        -- Make sure the script uses the schema
+        SET QUOTED_IDENTIFIER ON;
+        
+        -- Execute statements in the context of the specified schema
+        DECLARE @sql NVARCHAR(MAX) = N'
+          BEGIN TRANSACTION;
+          
+          -- Add schema prefix for table references
+          ${modifiedScript.replace(/'/g, "''")}
+          
+          COMMIT;
+        ';
+        
+        -- Execute the SQL in the context of the schema
+        EXEC sp_executesql @sql;
+      `);
+    } else {
+      // No schema, just execute the script directly
+      logger.info('No schema specified, executing form setup directly');
+      await tenantPool.request().batch(schemaScript);
     }
-    
-    // Execute the script to create the promises form
-    await tenantPool.request().batch(finalScript);
     
     logger.info('Political Promises Tracker form has been set up successfully.');
     process.exit(0);

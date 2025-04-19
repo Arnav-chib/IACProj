@@ -1,5 +1,7 @@
 const { createUser, getUserByEmail, getPool } = require('../../models/userModel');
 const logger = require('../../utils/logger');
+const fs = require('fs').promises;
+const path = require('path');
 const { initializeTenantDb, generateConnectionString } = require('../../utils/dbUtils');
 
 async function seedMasterUser() {
@@ -23,8 +25,51 @@ async function seedMasterUser() {
           }
           
           // Initialize tenant tables using this connection info
-          await initializeTenantDb(typeof connectionInfo === 'object' ? JSON.stringify(connectionInfo) : connectionInfo);
-          logger.info('Initialized tenant tables for existing admin user');
+          logger.info(`Ensuring tenant tables exist for admin user (${existingUser.UserID})`);
+          const pool = getPool();
+          
+          if (connectionInfo && connectionInfo.schema) {
+            const schemaName = connectionInfo.schema;
+            
+            // Check if tables already exist in this schema
+            const tableResult = await pool.request().query(`
+              SELECT COUNT(*) as tableCount 
+              FROM INFORMATION_SCHEMA.TABLES 
+              WHERE TABLE_SCHEMA = '${schemaName}'
+            `);
+            
+            if (tableResult.recordset[0].tableCount === 0) {
+              logger.info(`No tables found in schema ${schemaName}, creating them now...`);
+              
+              // Read tenant schema SQL file
+              const tenantSchemaPath = path.resolve(__dirname, '../../../db/tenantSchema.sql');
+              const tenantSchemaScript = await fs.readFile(tenantSchemaPath, 'utf8');
+              
+              // Execute the SQL within the user's schema
+              await pool.request().batch(`
+                -- Create tables in the specific schema
+                USE [${connectionInfo.database}];
+                
+                -- Execute statements in the context of the specified schema
+                DECLARE @sql NVARCHAR(MAX) = N'
+                  BEGIN TRANSACTION;
+                  
+                  ${tenantSchemaScript.replace(/'/g, "''")}
+                  
+                  COMMIT;
+                ';
+                
+                -- Execute the SQL in the context of the schema
+                EXEC sp_executesql @sql;
+              `);
+              
+              logger.info(`Successfully created tenant tables in schema ${schemaName}`);
+            } else {
+              logger.info(`Tables already exist in schema ${schemaName}`);
+            }
+          } else {
+            logger.warn('Admin user has invalid connection info');
+          }
         } catch (err) {
           logger.error('Error initializing tenant tables for existing admin user:', {
             error: err.message,
@@ -34,7 +79,7 @@ async function seedMasterUser() {
         }
       }
       
-      return;
+      return existingUser;
     }
 
     // Get column information to understand the schema
@@ -104,18 +149,42 @@ async function seedMasterUser() {
           WHERE UserID = @userId
         `);
       
-      // Initialize the tenant tables in this schema - CRITICAL STEP
-      await initializeTenantDb(connectionString);
+      // Initialize the tenant tables in this schema
+      logger.info(`Creating tenant tables in schema ${schemaName}`);
       
-      logger.logToConsole(`Created and initialized schema for admin user: ${user.UserID}, schema: ${schemaName}`);
+      // Read the tenant schema SQL directly
+      const tenantSchemaPath = path.resolve(__dirname, '../../../db/tenantSchema.sql');
+      const tenantSchemaScript = await fs.readFile(tenantSchemaPath, 'utf8');
+      
+      // Execute the SQL within the user's schema
+      await pool.request().batch(`
+        -- Create tables in the specific schema
+        USE [${config.database}];
+        
+        -- Execute statements in the context of the specified schema
+        DECLARE @sql NVARCHAR(MAX) = N'
+          BEGIN TRANSACTION;
+          
+          ${tenantSchemaScript.replace(/'/g, "''")}
+          
+          COMMIT;
+        ';
+        
+        -- Execute the SQL in the context of the schema
+        EXEC sp_executesql @sql;
+      `);
+      
+      logger.info(`Tenant database schema created successfully in schema ${schemaName}`);
+      
+      return user;
     } catch (dbError) {
       logger.error('Error creating schema for admin user:', {
         error: dbError.message,
         stack: dbError.stack,
         userId: user.UserID
       });
-      // Don't rethrow - we still want to consider the seeding successful
-      // even if the schema creation failed
+      // Don't rethrow - still return the user
+      return user;
     }
   } catch (error) {
     logger.error('Error seeding master user:', {

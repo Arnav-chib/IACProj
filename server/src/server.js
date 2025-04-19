@@ -66,11 +66,19 @@ async function startServer() {
     // Set pool for organization model
     setOrgPool(masterPool);
     
-    // Initialize master database schema
-    await initializeMasterDb(masterPool);
+    // Check if required tables exist before scheduling token cleanup
+    const tableCheckResult = await masterPool.request().query(`
+      SELECT COUNT(*) as count 
+      FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_NAME = 'API_Tokens'
+    `);
     
-    // Schedule cleanup of expired API tokens
-    scheduleTokenCleanup(masterPool);
+    if (tableCheckResult.recordset[0].count > 0) {
+      // Schedule cleanup of expired API tokens only if the table exists
+      scheduleTokenCleanup(masterPool);
+    } else {
+      logger.info('API_Tokens table does not exist yet. Token cleanup not scheduled.');
+    }
     
     // Start the server
     const server = app.listen(PORT, () => {
