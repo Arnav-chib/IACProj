@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import PropTypes from 'prop-types';
 import { parseFieldValue, processFieldValue } from '../../../services/responseService';
 
@@ -20,70 +20,95 @@ const BaseFieldWrapper = ({
 }) => {
   const { id, name, needsApproval, type } = field;
   
-  // If the field doesn't need approval, just render the children
+  // If the field doesn't need approval, just render the children directly
   if (!needsApproval) {
-    return children;
+    // Prevent unnecessary re-renders and prop changes
+    return React.Children.only(children);
   }
   
-  // Parse the value to extract the actual value and approval status
+  // Track the internal state of value and approval status
   const [fieldValue, setFieldValue] = useState('');
   const [isApproved, setIsApproved] = useState(false);
+  const [localValue, setLocalValue] = useState(value);
   
   // When the value changes externally, update our internal state
   useEffect(() => {
-    if (value !== undefined) {
-      // Log value for debugging
-      if (type === 'richtext') {
-        console.log(`Processing richtext field ${id}:`, value);
-      }
+    // Only update if the value has actually changed to prevent loops
+    if (value !== localValue) {
+      setLocalValue(value);
       
-      const { value: extractedValue, isApproved: extractedApproval } = parseFieldValue(value, field.type);
-      setFieldValue(extractedValue);
-      setIsApproved(extractedApproval);
-      
-      if (type === 'richtext') {
-        console.log(`Extracted values for ${id}:`, { extractedValue, extractedApproval });
+      if (value !== undefined) {
+        // Log value for debugging
+        if (type === 'richtext') {
+          console.log(`Processing richtext field ${id}:`, value);
+        }
+        
+        try {
+          const { value: extractedValue, isApproved: extractedApproval } = parseFieldValue(value, field.type);
+          setFieldValue(extractedValue);
+          setIsApproved(extractedApproval);
+          
+          if (type === 'richtext') {
+            console.log(`Extracted values for ${id}:`, { extractedValue, extractedApproval });
+          }
+        } catch (err) {
+          console.error(`Error parsing field value for ${id}:`, err);
+          // Fallback to raw value if parsing fails
+          setFieldValue(value);
+        }
       }
     }
-  }, [value, field.type, id, type]);
+  }, [value, field.type, id, type, localValue]);
   
   // When the internal field value changes, propagate it up with approval status
-  const handleFieldChange = (newValue, event) => {
+  const handleFieldChange = useCallback((newValue, event) => {
     console.log(`BaseFieldWrapper ${id} field change:`, { type: field.type, needsApproval });
+    
+    // Prevent default behavior for events
+    if (event) {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+    }
     
     // Store current scroll position
     const scrollPosition = window.scrollY;
     
-    // Always prevent default behavior to stop form submission
-    if (event) {
-      if (event.preventDefault) event.preventDefault();
-      if (event.stopPropagation) event.stopPropagation();
-    }
-    
+    // Update internal state
     setFieldValue(newValue);
     
     // Don't change approval status when editing content
     // Only apply the current approval status
-    const processedValue = processFieldValue(newValue, field.type, needsApproval, isApproved);
-    onChange(processedValue, event);
-    
-    // Restore scroll position
-    setTimeout(() => {
-      window.scrollTo(0, scrollPosition);
-    }, 0);
+    try {
+      const processedValue = processFieldValue(newValue, field.type, needsApproval, isApproved);
+      
+      // Update our local tracking value
+      setLocalValue(processedValue);
+      
+      // Use rAF to ensure the event is processed after the current execution
+      requestAnimationFrame(() => {
+        onChange(processedValue, event);
+        
+        // Restore scroll position
+        window.scrollTo(0, scrollPosition);
+      });
+    } catch (err) {
+      console.error(`Error processing field value for ${id}:`, err);
+      // Fallback - pass the raw value
+      onChange(newValue, event);
+    }
     
     // Return false to stop event propagation
     return false;
-  };
+  }, [id, field.type, needsApproval, isApproved, onChange]);
   
   // When approval status changes, update the value
-  const handleApprovalChange = (e) => {
-    // Store current scroll position
-    const scrollPosition = window.scrollY;
-    
+  const handleApprovalChange = useCallback((e) => {
     // Prevent default actions
     e.preventDefault();
     e.stopPropagation();
+    
+    // Store current scroll position
+    const scrollPosition = window.scrollY;
     
     const newApproved = e.target.checked;
     console.log(`Approval change for ${id}: ${isApproved} -> ${newApproved}`);
@@ -93,20 +118,29 @@ const BaseFieldWrapper = ({
       console.log(`Approval changed for ${id}:`, newApproved, fieldValue);
     }
     
-    // Process the existing fieldValue with the new approval status
-    const processedValue = processFieldValue(fieldValue, field.type, needsApproval, newApproved);
-    onChange(processedValue);
-    
-    // Restore scroll position
-    setTimeout(() => {
-      window.scrollTo(0, scrollPosition);
-    }, 0);
+    try {
+      // Process the existing fieldValue with the new approval status
+      const processedValue = processFieldValue(fieldValue, field.type, needsApproval, newApproved);
+      
+      // Update local tracking value
+      setLocalValue(processedValue);
+      
+      // Use rAF to ensure the event is processed after the current execution
+      requestAnimationFrame(() => {
+        onChange(processedValue);
+        
+        // Restore scroll position
+        window.scrollTo(0, scrollPosition);
+      });
+    } catch (err) {
+      console.error(`Error processing approval change for ${id}:`, err);
+    }
     
     return false;
-  };
+  }, [id, fieldValue, isApproved, type, needsApproval, onChange]);
   
-  // Clone the children with new props
-  const childrenWithProps = React.cloneElement(children, {
+  // Clone the children with new props - ensure we pass the correct value
+  const childrenWithProps = React.cloneElement(React.Children.only(children), {
     value: fieldValue,
     onChange: handleFieldChange,
     error,
@@ -156,4 +190,4 @@ BaseFieldWrapper.defaultProps = {
   isFormCreator: false,
 };
 
-export default BaseFieldWrapper; 
+export default memo(BaseFieldWrapper); 

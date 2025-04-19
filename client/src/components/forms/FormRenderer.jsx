@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getForm, submitResponse } from '../../services/formService';
 import TextInput from './fields/TextInput';
@@ -15,7 +15,6 @@ import Button from '../common/Button';
 
 const FormRenderer = () => {
   const { formId } = useParams();
-  // navigate is used for redirection after form submission in a future implementation
   const navigate = useNavigate();
   const [form, setForm] = useState(null);
   const [formValues, setFormValues] = useState({});
@@ -25,62 +24,73 @@ const FormRenderer = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   
-  useEffect(() => {
-    const loadForm = async () => {
-      try {
-        setLoading(true);
-        setNetworkError(null);
-        console.log(`FormRenderer: Loading form ${formId}`);
-        const formData = await getForm(formId);
-        console.log('FormRenderer: Form loaded successfully', formData);
-        setForm(formData);
-        
-        // Initialize form values
-        const initialValues = {};
-        formData.fields.forEach(field => {
-          // Initialize multiple select fields with empty arrays
-          if (field.type === 'dropdown' && field.population && field.population.multiple) {
-            initialValues[field.id] = [];
-          } else {
-            initialValues[field.id] = '';
-          }
-        });
-        setFormValues(initialValues);
-      } catch (error) {
-        console.error(`FormRenderer: Error loading form ${formId}:`, error);
-        if (error.message?.includes('Network Error') || error.code === 'ERR_NETWORK') {
-          setNetworkError('Unable to connect to the server. Please check your internet connection.');
-        } else if (error.response?.status === 404) {
-          setNetworkError('Form not found. It may have been deleted or moved.');
+  // Memoized form data fetching
+  const loadForm = useCallback(async () => {
+    try {
+      setLoading(true);
+      setNetworkError(null);
+      console.log(`FormRenderer: Loading form ${formId}`);
+      const formData = await getForm(formId);
+      console.log('FormRenderer: Form loaded successfully', formData);
+      setForm(formData);
+      
+      // Initialize form values
+      const initialValues = {};
+      formData.fields.forEach(field => {
+        // Initialize multiple select fields with empty arrays
+        if (field.type === 'dropdown' && field.population && field.population.multiple) {
+          initialValues[field.id] = [];
+        } else if (field.type === 'richtext') {
+          // Initialize rich text with empty content structure
+          initialValues[field.id] = JSON.stringify({
+            content: {
+              blocks: [{ text: '', type: 'unstyled', depth: 0, inlineStyleRanges: [], entityRanges: [], data: {} }],
+              entityMap: {}
+            },
+            isApproved: false
+          });
         } else {
-          setNetworkError(`Error loading form: ${error.message || 'Unknown error'}`);
+          initialValues[field.id] = '';
         }
-      } finally {
-        setLoading(false);
+      });
+      setFormValues(initialValues);
+    } catch (error) {
+      console.error(`FormRenderer: Error loading form ${formId}:`, error);
+      if (error.message?.includes('Network Error') || error.code === 'ERR_NETWORK') {
+        setNetworkError('Unable to connect to the server. Please check your internet connection.');
+      } else if (error.response?.status === 404) {
+        setNetworkError('Form not found. It may have been deleted or moved.');
+      } else {
+        setNetworkError(`Error loading form: ${error.message || 'Unknown error'}`);
       }
-    };
-    
-    loadForm();
+    } finally {
+      setLoading(false);
+    }
   }, [formId]);
   
-  const handleFieldChange = (fieldId, value, event) => {
+  useEffect(() => {
+    loadForm();
+  }, [loadForm]);
+  
+  // Controlled, debounced field change handler to prevent excessive re-renders
+  const handleFieldChange = useCallback((fieldId, value, event) => {
     console.log(`Field change: ${fieldId}`, { value, event: event?.type });
     
-    // Store current scroll position
-    const scrollPosition = window.scrollY;
-    
-    // Prevent form submission and page scroll
+    // Prevent default behavior to avoid form submission
     if (event) {
-      if (event.preventDefault) event.preventDefault();
-      if (event.stopPropagation) event.stopPropagation();
+      event.preventDefault?.();
+      event.stopPropagation?.();
     }
+    
+    // Save current scroll position
+    const scrollPosition = window.scrollY;
     
     setFormValues(prev => ({
       ...prev,
       [fieldId]: value
     }));
     
-    // Clear error for this field if any
+    // Clear any errors for this field
     if (errors[fieldId]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -89,18 +99,29 @@ const FormRenderer = () => {
       });
     }
     
-    // Restore scroll position
-    setTimeout(() => {
+    // Use requestAnimationFrame for smoother scrolling restoration
+    requestAnimationFrame(() => {
       window.scrollTo(0, scrollPosition);
-    }, 0);
-  };
+    });
+  }, [errors]);
   
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     const newErrors = {};
     
+    if (!form || !form.fields) return false;
+    
     form.fields.forEach(field => {
-      if (field.required && !formValues[field.id]) {
-        newErrors[field.id] = `${field.name} is required`;
+      // Check required fields
+      if (field.required) {
+        if (field.type === 'dropdown' && field.population?.multiple) {
+          // For multi-select dropdowns, check if array has items
+          const value = formValues[field.id];
+          if (!value || (Array.isArray(value) && value.length === 0)) {
+            newErrors[field.id] = `${field.name} is required`;
+          }
+        } else if (!formValues[field.id]) {
+          newErrors[field.id] = `${field.name} is required`;
+        }
       }
       
       // Apply custom validation if needed
@@ -125,18 +146,18 @@ const FormRenderer = () => {
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
+  }, [form, formValues]);
   
-  const preprocessFormData = () => {
+  const preprocessFormData = useCallback(() => {
     const processedValues = { ...formValues };
+    
+    if (!form || !form.fields) return processedValues;
     
     // Process file uploads if any
     const fileFieldIds = form.fields
       .filter(field => field.type === 'file')
       .map(field => field.id);
     
-    // For now, just log that file uploads would be handled here
-    // In a real implementation, you would upload the files and save the URLs
     fileFieldIds.forEach(fieldId => {
       const fileData = formValues[fieldId];
       if (fileData && fileData.file) {
@@ -153,10 +174,11 @@ const FormRenderer = () => {
     });
     
     return processedValues;
-  };
+  }, [form, formValues]);
   
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     
     if (!validateForm()) {
       return;
@@ -190,17 +212,16 @@ const FormRenderer = () => {
     } finally {
       setSubmitting(false);
     }
-  };
+  }, [formId, validateForm, preprocessFormData]);
   
-  const RenderField = ({ field, values, setValues, errors, disabled }) => {
+  // Memoized field renderer to prevent unnecessary re-renders
+  const RenderField = useCallback(({ field, values, setValues, errors, disabled }) => {
     const fieldId = field.id;
     const isFormCreator = false; // Regular form submitter, not the creator
     
     const handleChange = (value, event) => {
-      setValues((prev) => ({
-        ...prev,
-        [fieldId]: value,
-      }), event);
+      // Pass both the value and the event up to the parent component
+      handleFieldChange(fieldId, value, event);
     };
     
     // Render the field component based on type
@@ -279,7 +300,7 @@ const FormRenderer = () => {
           <Dropdown
             id={fieldId}
             label={field.name}
-            value={values[fieldId] || ''}
+            value={values[fieldId] || (isMultiple ? [] : '')}
             onChange={handleChange}
             required={field.required}
             error={errors[fieldId]}
@@ -379,7 +400,7 @@ const FormRenderer = () => {
         {fieldComponent}
       </BaseFieldWrapper>
     );
-  };
+  }, [form, handleFieldChange]);
   
   if (loading) {
     return <div className="flex justify-center p-8"><LoadingSpinner /></div>;
@@ -393,7 +414,7 @@ const FormRenderer = () => {
           <p>{networkError}</p>
         </div>
         <button 
-          onClick={() => window.location.reload()}
+          onClick={() => loadForm()}
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Try Again
@@ -441,7 +462,16 @@ const FormRenderer = () => {
         </div>
       )}
       
-      <form onSubmit={handleSubmit} onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}>
+      <form 
+        onSubmit={handleSubmit} 
+        onKeyDown={(e) => {
+          // Prevent form submission on Enter key
+          if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+          }
+        }}
+        noValidate
+      >
         {form.fields
           .filter(field => !field.groupId)
           .sort((a, b) => a.position - b.position)
@@ -450,7 +480,7 @@ const FormRenderer = () => {
               key={field.id}
               field={field}
               values={formValues}
-              setValues={setFormValues}
+              setValues={handleFieldChange}
               errors={errors}
               disabled={submitting}
             />

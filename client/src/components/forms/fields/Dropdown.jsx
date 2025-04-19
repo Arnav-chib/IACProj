@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 
 const Dropdown = ({ 
   id, 
@@ -9,7 +9,8 @@ const Dropdown = ({
   required = false, 
   error = null,
   multiple = false,
-  placeholder = 'Select...'
+  placeholder = 'Select...',
+  disabled = false
 }) => {
   const selectRef = useRef(null);
   
@@ -27,24 +28,34 @@ const Dropdown = ({
     }
   }, [value, multiple]);
 
-  const handleChange = (e) => {
+  // Memoized change handler to prevent unnecessary re-renders
+  const handleChange = useCallback((e) => {
     console.log(`Dropdown ${id} change event`);
     
-    // This is crucial - prevent default right away before any state updates
+    // Prevent default behavior immediately
     e.preventDefault();
     e.stopPropagation();
     
-    // Store current scroll position
+    // Save scroll position
     const scrollPosition = window.scrollY;
     
     if (multiple) {
       // For multi-select, create an array of selected values
       const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
       setInternalValue(selectedOptions);
-      onChange(selectedOptions, e);
+      
+      // Use setTimeout to ensure the event is processed after the current execution
+      setTimeout(() => {
+        onChange(selectedOptions, e);
+      }, 0);
     } else {
-      setInternalValue(e.target.value);
-      onChange(e.target.value, e);
+      const newValue = e.target.value;
+      setInternalValue(newValue);
+      
+      // Use setTimeout to ensure the event is processed after the current execution
+      setTimeout(() => {
+        onChange(newValue, e);
+      }, 0);
     }
     
     // For multiple select, maintain focus on the select element
@@ -52,30 +63,32 @@ const Dropdown = ({
       selectRef.current.focus();
     }
     
-    // Restore scroll position
-    setTimeout(() => {
+    // Restore scroll position after a slight delay
+    requestAnimationFrame(() => {
       window.scrollTo(0, scrollPosition);
-    }, 0);
+    });
     
-    // Return false to ensure event doesn't bubble up
-    return false;
-  };
+    return false; // Ensure event doesn't bubble up
+  }, [id, multiple, onChange]);
 
-  // Prevent mousedown default behavior which can cause perceived refresh
-  const handleMouseDown = (e) => {
-    // Allow the dropdown to open normally
-    // Just stop propagation to prevent any parent handlers
+  // Prevent event propagation on mouse events
+  const handleMouseDown = useCallback((e) => {
     e.stopPropagation();
-  };
+  }, []);
   
-  // Prevent enter key from submitting the form
-  const handleKeyDown = (e) => {
+  // Handle keyboard events - prevent form submission
+  const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
       return false;
     }
-  };
+  }, []);
+
+  // Create a memoized click handler to stop propagation
+  const handleClick = useCallback((e) => {
+    e.stopPropagation();
+  }, []);
 
   return (
     <div className="mb-4">
@@ -89,17 +102,20 @@ const Dropdown = ({
       <select
         ref={selectRef}
         id={id}
+        name={id}
         value={internalValue}
         onChange={handleChange}
         onMouseDown={handleMouseDown}
+        onClick={handleClick}
         onKeyDown={handleKeyDown}
         required={required}
         multiple={multiple}
-        className={`block w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${multiple ? 'min-h-[100px]' : ''}`}
+        disabled={disabled}
+        className={`block w-full px-3 py-2 border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${disabled ? 'bg-gray-100 text-gray-500' : ''} ${multiple ? 'min-h-[100px]' : ''}`}
       >
         {!multiple && <option value="">{placeholder}</option>}
         {options.map(option => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value || 'empty'} value={option.value}>
             {option.label}
           </option>
         ))}
@@ -121,4 +137,4 @@ const Dropdown = ({
   );
 };
 
-export default Dropdown;
+export default React.memo(Dropdown);
