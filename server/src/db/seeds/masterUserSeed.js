@@ -31,9 +31,6 @@ async function seedMasterUser() {
       username: 'admin',
       email: 'admin@gmail.com',
       password: 'admin123',
-      firstName: 'Admin',
-      lastName: 'User',
-      role: 'admin',
       isSystemAdmin: true,
       subscriptionStatus: 'active',
     };

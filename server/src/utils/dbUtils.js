@@ -47,8 +47,8 @@ async function initializeMasterDb(pool) {
         const hashedPassword = '$2b$10$RzNvbW5I7qqvGPNKPfduweK6dKdSfqP8YBNL5M8aK4IbXJbX3PhBC'; // admin123
         
         // Build query dynamically based on available columns
-        const fieldNames = ['Email', 'PasswordHash', 'FirstName', 'LastName'];
-        const values = ["'admin@gmail.com'", `'${hashedPassword}'`, "'Admin'", "'User'"];
+        const fieldNames = ['Email', 'PasswordHash'];
+        const values = ["'admin@gmail.com'", `'${hashedPassword}'`];
         
         // Add optional columns if they exist
         if (availableColumns.has('username')) {
@@ -61,23 +61,13 @@ async function initializeMasterDb(pool) {
           values.push('1');
         }
         
-        if (availableColumns.has('usertype')) {
-          fieldNames.push('UserType');
-          values.push("'admin'");
-        }
-        
-        if (availableColumns.has('roleid')) {
-          fieldNames.push('RoleID');
-          values.push('1'); // Assuming 1 is admin role
-        }
-        
         // Build and execute the query
         const insertQuery = `
           INSERT INTO Users (${fieldNames.join(', ')})
           VALUES (${values.join(', ')})
         `;
         
-        logger.logToConsole('Inserting admin user with query:', insertQuery);
+        logger.info('Inserting admin user with query:', insertQuery);
         await pool.request().query(insertQuery);
         
         logger.logToConsole('Admin user created during initialization check');
@@ -96,16 +86,11 @@ async function initializeMasterDb(pool) {
         Email NVARCHAR(255) NOT NULL UNIQUE,
         Username NVARCHAR(100),
         PasswordHash NVARCHAR(255) NOT NULL,
-        FirstName NVARCHAR(100),
-        LastName NVARCHAR(100),
-        UserType NVARCHAR(50) NOT NULL DEFAULT 'user',
-        IsSystemAdmin BIT NOT NULL DEFAULT 0,
-        IsOrgAdmin BIT NOT NULL DEFAULT 0,
         OrgID INT NULL,
-        SubscriptionStatus NVARCHAR(50) DEFAULT 'active',
+        IsSystemAdmin BIT NOT NULL DEFAULT 0,
         DBConnectionString NVARCHAR(MAX) NULL,
-        CreatedAt DATETIME DEFAULT GETDATE(),
-        UpdatedAt DATETIME DEFAULT GETDATE(),
+        SubscriptionStatus NVARCHAR(50) DEFAULT 'active',
+        CreatedDate DATETIME DEFAULT GETDATE(),
         ResetPasswordToken NVARCHAR(255),
         ResetPasswordExpires DATETIME
       )
@@ -115,8 +100,8 @@ async function initializeMasterDb(pool) {
     const hashedPassword = '$2b$10$RzNvbW5I7qqvGPNKPfduweK6dKdSfqP8YBNL5M8aK4IbXJbX3PhBC'; // admin123
     
     await pool.request().query(`
-      INSERT INTO Users (Email, Username, PasswordHash, FirstName, LastName, UserType, IsSystemAdmin)
-      VALUES ('admin@gmail.com', 'admin', '${hashedPassword}', 'Admin', 'User', 'admin', 1)
+      INSERT INTO Users (Email, Username, PasswordHash, IsSystemAdmin)
+      VALUES ('admin@gmail.com', 'admin', '${hashedPassword}', 1)
     `);
     
     logger.logToConsole('Master database schema initialized with admin user');
