@@ -20,7 +20,7 @@ const AboutUs = () => {
       console.log('Fetching About Us content...');
       const response = await api.get('/system/about');
       console.log('About Us response:', response.data);
-      setContent(response.data.data.content);
+      setContent(response.data.data ? response.data.data.Content : '');
       setIsLoading(false);
       setError(null);
     } catch (error) {

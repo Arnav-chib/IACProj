@@ -13,7 +13,7 @@ export const getForms = async () => {
   console.log('Fetching forms...');
   const response = await api.get('/forms');
   console.log('Forms response:', response.data);
-  return response.data.data || [];
+  return response.data.forms || [];
 };
 
 // Submit form response

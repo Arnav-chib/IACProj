@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../services/api';
 
 const BlogDetail = () => {
   const { slug } = useParams();
@@ -13,7 +13,7 @@ const BlogDetail = () => {
 
   const fetchBlogPost = useCallback(async () => {
     try {
-      const response = await axios.get(`/api/system/blog/${slug}`);
+      const response = await api.get(`/system/blog/${slug}`);
       setPost(response.data.data);
       setIsLoading(false);
     } catch (error) {
@@ -35,7 +35,7 @@ const BlogDetail = () => {
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this blog post?')) {
       try {
-        await axios.delete(`/api/system/blog/${post.ContentID}`);
+        await api.delete(`/system/blog/${post.ContentID}`);
         toast.success('Blog post deleted successfully');
         navigate('/blog');
       } catch (error) {
