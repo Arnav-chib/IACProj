@@ -28,47 +28,33 @@ async function seedMasterUser() {
           logger.info(`Ensuring tenant tables exist for admin user (${existingUser.UserID})`);
           const pool = getPool();
           
-          if (connectionInfo && connectionInfo.schema) {
-            const schemaName = connectionInfo.schema;
+          // Check if tables already exist in the dbo schema
+          const tableResult = await pool.request().query(`
+            SELECT COUNT(*) as tableCount 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'FormMaster'
+          `);
+          
+          if (tableResult.recordset[0].tableCount === 0) {
+            logger.info(`No tenant tables found, creating them now...`);
             
-            // Check if tables already exist in this schema
-            const tableResult = await pool.request().query(`
-              SELECT COUNT(*) as tableCount 
-              FROM INFORMATION_SCHEMA.TABLES 
-              WHERE TABLE_SCHEMA = '${schemaName}'
-            `);
+            // Read tenant schema SQL file
+            const tenantSchemaPath = path.resolve(__dirname, '../../../db/tenantSchema.sql');
+            const tenantSchemaScript = await fs.readFile(tenantSchemaPath, 'utf8');
             
-            if (tableResult.recordset[0].tableCount === 0) {
-              logger.info(`No tables found in schema ${schemaName}, creating them now...`);
-              
-              // Read tenant schema SQL file
-              const tenantSchemaPath = path.resolve(__dirname, '../../../db/tenantSchema.sql');
-              const tenantSchemaScript = await fs.readFile(tenantSchemaPath, 'utf8');
-              
-              // Execute the SQL within the user's schema
-              await pool.request().batch(`
-                -- Create tables in the specific schema
-                USE [${connectionInfo.database}];
-                
-                -- Execute statements in the context of the specified schema
-                DECLARE @sql NVARCHAR(MAX) = N'
-                  BEGIN TRANSACTION;
-                  
-                  ${tenantSchemaScript.replace(/'/g, "''")}
-                  
-                  COMMIT;
-                ';
-                
-                -- Execute the SQL in the context of the schema
-                EXEC sp_executesql @sql;
-              `);
-              
-              logger.info(`Successfully created tenant tables in schema ${schemaName}`);
-            } else {
-              logger.info(`Tables already exist in schema ${schemaName}`);
-            }
+            // Modified script to fix clustered index issue
+            const modifiedScript = tenantSchemaScript.replace(
+              /CREATE CLUSTERED INDEX IX_FormDetails_FormID ON FormDetails\(FormID, Position\)/g,
+              `IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_FormDetails_FormID' AND object_id = OBJECT_ID('FormDetails'))
+               CREATE NONCLUSTERED INDEX IX_FormDetails_FormID ON FormDetails(FormID, Position)`
+            );
+            
+            // Execute the SQL in the dbo schema
+            await pool.request().batch(modifiedScript);
+            
+            logger.info(`Successfully created tenant tables in dbo schema`);
           } else {
-            logger.warn('Admin user has invalid connection info');
+            logger.info(`Tenant tables already exist in dbo schema`);
           }
         } catch (err) {
           logger.error('Error initializing tenant tables for existing admin user:', {
@@ -111,35 +97,24 @@ async function seedMasterUser() {
     const user = await createUser(masterUser);
     logger.info('Master user created successfully', { userId: user.UserID });
     
-    // For master user, create a schema in the master database
+    // Create connection string for the user
     try {
-      // Create a schema for this user in the master database
-      const schemaName = `User_${user.UserID}_Schema`;
-      
-      // Create schema if it doesn't exist
-      await pool.request().query(`
-        IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '${schemaName}')
-        BEGIN
-          EXEC('CREATE SCHEMA [${schemaName}]')
-        END
-      `);
-      
       // Get the current database configuration
       const config = await pool.config;
       
-      // Create a proper connection string for this schema
+      // Create a connection string using the default dbo schema
       const dbConfig = {
         server: config.server,
         database: config.database,
         user: config.user,
         password: config.password,
-        options: config.options,
-        schema: schemaName
+        options: config.options
+        // No schema specified - will use default 'dbo'
       };
       
       const connectionString = JSON.stringify(dbConfig);
       
-      // Update the user record with the proper connection information
+      // Update the user record with the connection information
       await pool.request()
         .input('userId', user.UserID)
         .input('dbConnectionString', connectionString)
@@ -149,32 +124,24 @@ async function seedMasterUser() {
           WHERE UserID = @userId
         `);
       
-      // Initialize the tenant tables in this schema
-      logger.info(`Creating tenant tables in schema ${schemaName}`);
+      // Initialize the tenant tables in the dbo schema
+      logger.info(`Creating tenant tables in dbo schema`);
       
       // Read the tenant schema SQL directly
       const tenantSchemaPath = path.resolve(__dirname, '../../../db/tenantSchema.sql');
       const tenantSchemaScript = await fs.readFile(tenantSchemaPath, 'utf8');
       
-      // Execute the SQL within the user's schema
-      await pool.request().batch(`
-        -- Create tables in the specific schema
-        USE [${config.database}];
-        
-        -- Execute statements in the context of the specified schema
-        DECLARE @sql NVARCHAR(MAX) = N'
-          BEGIN TRANSACTION;
-          
-          ${tenantSchemaScript.replace(/'/g, "''")}
-          
-          COMMIT;
-        ';
-        
-        -- Execute the SQL in the context of the schema
-        EXEC sp_executesql @sql;
-      `);
+      // Modified script to fix clustered index issue
+      const modifiedScript = tenantSchemaScript.replace(
+        /CREATE CLUSTERED INDEX IX_FormDetails_FormID ON FormDetails\(FormID, Position\)/g,
+        `IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_FormDetails_FormID' AND object_id = OBJECT_ID('FormDetails'))
+         CREATE NONCLUSTERED INDEX IX_FormDetails_FormID ON FormDetails(FormID, Position)`
+      );
       
-      logger.info(`Tenant database schema created successfully in schema ${schemaName}`);
+      // Execute the modified SQL directly
+      await pool.request().batch(modifiedScript);
+      
+      logger.info(`Tenant database schema created successfully in dbo schema`);
       
       return user;
     } catch (dbError) {

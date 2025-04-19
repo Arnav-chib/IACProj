@@ -80,7 +80,7 @@ END
 
 -- Create optimized indexes
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_FormDetails_FormID')
-    CREATE CLUSTERED INDEX IX_FormDetails_FormID ON FormDetails(FormID, Position);
+    CREATE NONCLUSTERED INDEX IX_FormDetails_FormID ON FormDetails(FormID, Position);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_FormDetails_Status')
     CREATE NONCLUSTERED INDEX IX_FormDetails_Status ON FormDetails(Status);
@@ -89,7 +89,7 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_GroupDetails_FormID')
     CREATE NONCLUSTERED INDEX IX_GroupDetails_FormID ON GroupDetails(FormID);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_ResponseDetails_ResponseID')
-    CREATE CLUSTERED INDEX IX_ResponseDetails_ResponseID ON ResponseDetails(ResponseID);
+    CREATE NONCLUSTERED INDEX IX_ResponseDetails_ResponseID ON ResponseDetails(ResponseID);
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_FormResponses_FormID')
     CREATE NONCLUSTERED INDEX IX_FormResponses_FormID ON FormResponses(FormID);

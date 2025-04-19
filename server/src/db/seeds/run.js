@@ -118,75 +118,39 @@ async function runSeeds() {
     logger.info('All seeds completed successfully');
     
     // For debugging and development help - check if the admin user's tables exist
-    logger.info('Checking admin user tenant schema tables...');
+    logger.info('Checking tenant tables...');
     
     try {
-      // Find the admin user
-      const adminResult = await masterPool.request().query(`
-        SELECT * FROM Users WHERE Email = 'admin@gmail.com'
+      // Check if tenant tables exist in the dbo schema
+      const tableResult = await masterPool.request().query(`
+        SELECT COUNT(*) AS tableCount 
+        FROM INFORMATION_SCHEMA.TABLES 
+        WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'FormMaster'
       `);
       
-      if (adminResult.recordset.length > 0) {
-        const adminUser = adminResult.recordset[0];
-        logger.info(`Found admin user with ID: ${adminUser.UserID}`);
+      if (tableResult.recordset[0].tableCount === 0) {
+        logger.warn('No tenant tables found in dbo schema! Creating tables now...');
         
-        // Check if we can find their schema
-        try {
-          const connectionInfo = typeof adminUser.DBConnectionString === 'string' 
-            ? JSON.parse(adminUser.DBConnectionString) 
-            : adminUser.DBConnectionString;
-          
-          if (connectionInfo && connectionInfo.schema) {
-            logger.info(`Admin user has schema: ${connectionInfo.schema}`);
-            
-            // Check if the tables exist in this schema
-            const tableResult = await masterPool.request().query(`
-              SELECT TABLE_NAME 
-              FROM INFORMATION_SCHEMA.TABLES 
-              WHERE TABLE_SCHEMA = '${connectionInfo.schema}'
-            `);
-            
-            if (tableResult.recordset.length > 0) {
-              logger.info('Tables found in admin schema:');
-              tableResult.recordset.forEach(table => {
-                logger.info(`- ${table.TABLE_NAME}`);
-              });
-            } else {
-              logger.warn('No tables found in admin user schema! Creating tables now...');
-              
-              // Get tenant schema SQL
-              const tenantSchemaPath = path.resolve(__dirname, '../../../db/tenantSchema.sql');
-              const tenantSchemaScript = await fs.readFile(tenantSchemaPath, 'utf8');
-              
-              // Execute tenant schema SQL within the admin user's schema
-              await masterPool.request().batch(`
-                -- Set the schema context
-                USE [${connectionInfo.database}];
-                
-                -- Create tenant tables in the specific schema
-                SET QUOTED_IDENTIFIER ON;
-                
-                -- Execute statements in the context of the specified schema
-                EXEC('
-                  BEGIN TRANSACTION;
-                  
-                  ${tenantSchemaScript.replace(/'/g, "''")}
-                  
-                  COMMIT;
-                ');
-              `);
-              
-              logger.info('Successfully created tenant tables in admin schema');
-            }
-          } else {
-            logger.warn('Admin user does not have a valid schema configuration');
-          }
-        } catch (e) {
-          logger.error('Error processing admin user schema:', e);
-        }
+        // Get tenant schema SQL
+        const tenantSchemaPath = path.resolve(__dirname, '../../../db/tenantSchema.sql');
+        const tenantSchemaScript = await fs.readFile(tenantSchemaPath, 'utf8');
+        
+        // Modified script to fix clustered index issue
+        const modifiedScript = tenantSchemaScript.replace(
+          /CREATE CLUSTERED INDEX IX_FormDetails_FormID ON FormDetails\(FormID, Position\)/g,
+          `IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_FormDetails_FormID' AND object_id = OBJECT_ID('FormDetails'))
+           CREATE NONCLUSTERED INDEX IX_FormDetails_FormID ON FormDetails(FormID, Position)`
+        );
+        
+        // Execute the SQL directly
+        await masterPool.request().batch(modifiedScript);
+        
+        logger.info('Successfully created tenant tables in dbo schema');
+      } else {
+        logger.info('Tenant tables already exist in dbo schema');
       }
     } catch (e) {
-      logger.error('Error checking admin user schema:', e);
+      logger.error('Error creating tenant tables:', e);
     }
     
     process.exit(0);
