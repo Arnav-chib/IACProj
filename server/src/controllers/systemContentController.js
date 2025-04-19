@@ -2,7 +2,8 @@ const {
   getAboutUs, 
   updateAboutUs, 
   getAllBlogPosts, 
-  getBlogPostBySlug, 
+  getBlogPostBySlug,
+  getBlogPostById,
   createBlogPost, 
   updateBlogPost, 
   deleteBlogPost 
@@ -59,6 +60,21 @@ const getBlogPost = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Get blog post by ID (for editing)
+ */
+const getBlogPostById = asyncHandler(async (req, res) => {
+  const { contentId } = req.params;
+  
+  const blogPost = await getBlogPostById(contentId);
+  
+  if (!blogPost) {
+    return sendError(res, 404, 'Blog post not found');
+  }
+  
+  sendSuccess(res, 200, 'Blog post retrieved successfully', blogPost);
+});
+
+/**
  * Create new blog post
  */
 const createNewBlogPost = asyncHandler(async (req, res) => {
@@ -98,6 +114,7 @@ module.exports = {
   updateAboutUsContent,
   getBlogPosts,
   getBlogPost,
+  getBlogPostById,
   createNewBlogPost,
   updateExistingBlogPost,
   deleteExistingBlogPost

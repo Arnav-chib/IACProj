@@ -26,6 +26,14 @@ router.get('/blog/:slug', [
   validateRequest
 ], systemContentController.getBlogPost);
 
+// Get blog post by ID for editing (system admin only)
+router.get('/blog/edit/:contentId', [
+  isAuthenticated,
+  isSystemAdmin,
+  param('contentId').isInt().withMessage('Invalid content ID'),
+  validateRequest
+], systemContentController.getBlogPostById);
+
 // Create blog post (system admin only)
 router.post('/blog', [
   isAuthenticated,

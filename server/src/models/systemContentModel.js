@@ -131,6 +131,34 @@ async function getBlogPostBySlug(slug) {
   }
 }
 
+// Get blog post by ID
+async function getBlogPostById(contentId) {
+  try {
+    const result = await masterPool.request()
+      .input('contentType', sql.NVarChar, 'blog_post')
+      .input('contentId', sql.Int, contentId)
+      .query(`
+        SELECT 
+          sc.ContentID,
+          sc.Title,
+          sc.Content,
+          sc.Slug,
+          sc.PublishedAt,
+          sc.CreatedAt,
+          sc.UpdatedAt,
+          u.Username as AuthorName
+        FROM SystemContent sc
+        JOIN Users u ON sc.CreatedBy = u.UserID
+        WHERE sc.ContentType = @contentType AND sc.ContentID = @contentId
+      `);
+    
+    return result.recordset[0];
+  } catch (error) {
+    logger.error('Error getting blog post by ID:', error);
+    throw error;
+  }
+}
+
 // Create blog post
 async function createBlogPost(userId, title, content, slug) {
   try {
@@ -213,6 +241,7 @@ module.exports = {
   updateAboutUs,
   getAllBlogPosts,
   getBlogPostBySlug,
+  getBlogPostById,
   createBlogPost,
   updateBlogPost,
   deleteBlogPost

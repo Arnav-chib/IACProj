@@ -1,5 +1,7 @@
 const { submitFormResponse, getFormResponses } = require('../services/responseService');
 const sql = require('mssql');
+const { sendSuccess, sendError } = require('../utils/responseUtils');
+const asyncHandler = require('express-async-handler');
 
 // Submit response
 async function submitResponse(req, res) {
@@ -20,25 +22,22 @@ async function submitResponse(req, res) {
   }
 }
 
-// List responses for a form
-async function listResponses(req, res) {
+/**
+ * Get form responses
+ */
+const getFormResponses = asyncHandler(async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id: formId } = req.params;
     
-    // Get responses
-    const responses = await getFormResponses(id, req.tenantDbConnection);
+    // Get form responses
+    const responses = await getFormResponses(formId, req.tenantDbConnection);
     
-    res.json({ responses });
+    sendSuccess(res, 200, 'Form responses retrieved successfully', { responses });
   } catch (error) {
-    console.error('Error listing responses:', error);
-    
-    if (error.message === 'Form not found') {
-      return res.status(404).json({ error: 'Form not found' });
-    }
-    
-    res.status(500).json({ error: 'Failed to retrieve responses' });
+    console.error('Error getting form responses:', error);
+    sendError(res, 500, 'Failed to retrieve form responses');
   }
-}
+});
 
 // Update response field approval status
 async function updateResponseApproval(req, res) {
@@ -92,7 +91,7 @@ async function deleteResponse(req, res) {
 
 module.exports = {
   submitResponse,
-  listResponses,
-  updateResponseApproval,
-  deleteResponse
+  getFormResponses,
+  deleteResponse,
+  updateResponseApproval
 };

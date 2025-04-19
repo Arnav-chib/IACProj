@@ -39,9 +39,22 @@ export const getForm = async (formId) => {
 // List forms for current user
 export const getForms = async () => {
   console.log('Fetching forms...');
-  const response = await api.get('/forms');
-  console.log('Forms response:', response.data);
-  return response.data.forms || [];
+  try {
+    const response = await api.get('/forms');
+    console.log('Forms response:', response.data);
+    // Handle both response formats: { forms: [] } or { data: [] }
+    return response.data.forms || response.data.data || [];
+  } catch (error) {
+    console.error('Error fetching forms:', error);
+    // Provide more details for debugging
+    if (error.response) {
+      console.error('Response status:', error.response.status);
+      console.error('Response data:', error.response.data);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+    }
+    throw error;
+  }
 };
 
 /**

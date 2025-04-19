@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { toast } from 'react-toastify';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { api } from '../../services/api';
 
 const BlogForm = () => {
   // Extract id directly from params without expecting action
@@ -49,8 +49,8 @@ const BlogForm = () => {
 
   const fetchBlogPost = useCallback(async () => {
     try {
-      // Fetch the blog post directly by ID
-      const response = await axios.get(`/api/system/blog/${id}`);
+      // Use a different endpoint for retrieving blog post by ID
+      const response = await api.get(`/system/blog/edit/${id}`);
       const post = response.data.data;
       
       if (post) {
@@ -61,17 +61,17 @@ const BlogForm = () => {
         });
       } else {
         toast.error('Blog post not found');
-        navigate('/blog');
+        // Don't navigate away automatically - let user try again or manually navigate
       }
       
       setIsLoading(false);
     } catch (error) {
       console.error('Error fetching blog post:', error);
-      toast.error('Failed to load blog post');
+      toast.error('Failed to load blog post. Please try again.');
       setIsLoading(false);
-      navigate('/blog');
+      // Don't navigate away automatically
     }
-  }, [id, navigate]);
+  }, [id]);
 
   useEffect(() => {
     if (isEditMode && id) {
@@ -122,12 +122,13 @@ const BlogForm = () => {
       console.log('Submitting blog post:', formData);
       
       if (isEditMode) {
-        // Fix the PUT endpoint - use contentId instead of id in the URL
-        const response = await axios.put(`/api/system/blog/${id}`, formData);
+        // Use the api service instead of axios directly
+        const response = await api.put(`/system/blog/${id}`, formData);
         console.log('Blog update response:', response);
         toast.success('Blog post updated successfully');
       } else {
-        const response = await axios.post('/api/system/blog', formData);
+        // Use the api service instead of axios directly
+        const response = await api.post('/system/blog', formData);
         console.log('Blog create response:', response);
         toast.success('Blog post created successfully');
       }
@@ -135,7 +136,7 @@ const BlogForm = () => {
       navigate('/blog');
     } catch (error) {
       console.error('Error saving blog post:', error);
-      console.error('API endpoint:', isEditMode ? `/api/system/blog/${id}` : '/api/system/blog');
+      console.error('API endpoint:', isEditMode ? `/system/blog/${id}` : '/system/blog');
       console.error('Response status:', error.response?.status);
       console.error('Response data:', error.response?.data);
       
