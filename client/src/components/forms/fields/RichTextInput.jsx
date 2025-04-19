@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, memo } from 'react';
+import React, { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { Editor } from 'react-draft-wysiwyg';
 import { EditorState, ContentState, convertToRaw, convertFromRaw } from 'draft-js';
 import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css';
@@ -6,6 +6,12 @@ import PropTypes from 'prop-types';
 
 const RichTextInput = ({ id, label, value, onChange, required, error, needsApproval, isFormCreator, disabled }) => {
   console.log(`RichTextInput rendering for ${id}:`, { value, needsApproval, isFormCreator, disabled });
+  
+  // Reference to the editor for focus management
+  const editorRef = useRef(null);
+  
+  // Track if we're currently editing to prevent loops
+  const [isEditing, setIsEditing] = useState(false);
   
   // Initialize editor state from value prop, handling different formats
   const [editorState, setEditorState] = useState(() => {
@@ -46,8 +52,8 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
 
   // Parse the approval status from value on component mount or when value changes
   useEffect(() => {
-    // Only update if the value has actually changed
-    if (value !== localValue) {
+    // Only update if the value has actually changed and we're not in the middle of editing
+    if (value !== localValue && !isEditing) {
       setLocalValue(value);
       
       try {
@@ -63,25 +69,51 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
           
           // Update editor state if content exists
           if (parsedValue.content) {
-            setEditorState(EditorState.createWithContent(convertFromRaw(parsedValue.content)));
+            // Preserve selection state when updating content
+            const currentSelection = editorState.getSelection();
+            const newState = EditorState.createWithContent(convertFromRaw(parsedValue.content));
+            setEditorState(
+              EditorState.forceSelection(newState, currentSelection)
+            );
           } else if (parsedValue.value && parsedValue.value.content) {
-            setEditorState(EditorState.createWithContent(convertFromRaw(parsedValue.value.content)));
+            // Preserve selection state when updating content
+            const currentSelection = editorState.getSelection();
+            const newState = EditorState.createWithContent(convertFromRaw(parsedValue.value.content));
+            setEditorState(
+              EditorState.forceSelection(newState, currentSelection)
+            );
           }
         } else if (value && typeof value === 'string') {
-          // Plain text
-          setEditorState(EditorState.createWithContent(ContentState.createFromText(value)));
+          // Plain text - preserve selection
+          const currentSelection = editorState.getSelection();
+          const newState = EditorState.createWithContent(ContentState.createFromText(value));
+          setEditorState(
+            EditorState.forceSelection(newState, currentSelection)
+          );
         }
       } catch (e) {
         console.error('Error parsing value in useEffect:', e);
       }
     }
-  }, [value, localValue]);
+  }, [value, localValue, editorState, isEditing]);
 
-  // Debounced editor change handler
+  // Focus management
+  const handleEditorFocus = useCallback(() => {
+    setIsEditing(true);
+  }, []);
+
+  const handleEditorBlur = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  // Debounced editor change handler with improved selection state management
   const handleEditorChange = useCallback((newState) => {
     console.log(`Editor changed for ${id}`);
     
-    // Update local state immediately
+    // Ensure we're in editing mode
+    setIsEditing(true);
+    
+    // Update local state immediately - this preserves cursor position
     setEditorState(newState);
     
     // Capture the raw content
@@ -100,13 +132,13 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
     const valueString = JSON.stringify(newValue);
     setLocalValue(valueString);
     
-    // Use setTimeout to avoid immediate re-render
-    setTimeout(() => {
+    // Use requestAnimationFrame for smoother updates
+    requestAnimationFrame(() => {
       onChange(valueString);
       
       // Restore scroll position
       window.scrollTo(0, scrollPosition);
-    }, 0);
+    });
   }, [id, isApproved, onChange]);
 
   // Handle approval checkbox changes
@@ -150,10 +182,14 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
         onClick={e => e.stopPropagation()}
       >
         <Editor
+          ref={editorRef}
           editorState={editorState}
           onEditorStateChange={handleEditorChange}
+          onFocus={handleEditorFocus}
+          onBlur={handleEditorBlur}
           wrapperClassName="rich-text-wrapper"
           editorClassName="rich-text-editor min-h-[200px]"
+          toolbarClassName="rich-text-toolbar"
           toolbar={{
             options: ['inline', 'blockType', 'fontSize', 'list', 'textAlign', 'link', 'image', 'remove', 'history'],
             inline: { inDropdown: true },
@@ -167,6 +203,8 @@ const RichTextInput = ({ id, label, value, onChange, required, error, needsAppro
             e.stopPropagation(); // Prevent form submission
             return false; // Let editor handle return normally
           }}
+          preserveSelectionOnBlur={true}
+          spellCheck={true}
         />
       </div>
       
