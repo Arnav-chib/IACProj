@@ -83,15 +83,26 @@ const getBlogPostById = asyncHandler(async (req, res) => {
  */
 const createNewBlogPost = asyncHandler(async (req, res) => {
   const { title, content, slug } = req.body;
+  
+  // Validate required fields
+  if (!title || !content || !slug) {
+    return sendError(res, 400, 'Title, content, and slug are required');
+  }
+  
+  // Extract userId properly from the user object
   const userId = req.user.id || req.user.UserID || req.user.userId;
   
   if (!userId) {
     return sendError(res, 400, 'User ID not found');
   }
   
-  const contentId = await createBlogPost(userId, title, content, slug);
-  
-  sendSuccess(res, 201, 'Blog post created successfully', { contentId });
+  try {
+    const contentId = await createBlogPost(userId, title, content, slug);
+    sendSuccess(res, 201, 'Blog post created successfully', { contentId });
+  } catch (error) {
+    console.error('Error creating blog post:', error);
+    sendError(res, 500, `Failed to create blog post: ${error.message}`);
+  }
 });
 
 /**

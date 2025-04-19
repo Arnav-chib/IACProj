@@ -22,6 +22,8 @@ const ResponseView = () => {
   const [fieldApprovals, setFieldApprovals] = useState({});
 
   useEffect(() => {
+    let isMounted = true; // Track if component is mounted
+    
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -31,17 +33,27 @@ const ResponseView = () => {
           getFormResponses(formId)
         ]);
         
-        setForm(formData);
-        setResponses(responseData);
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setForm(formData);
+          setResponses(responseData);
+          setLoading(false);
+        }
       } catch (err) {
         console.error('Error fetching data:', err);
-        setError('Failed to load form responses. Please try again.');
-      } finally {
-        setLoading(false);
+        if (isMounted) {
+          setError(`Failed to load form responses: ${err.message || 'Unknown error'}`);
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
   }, [formId]);
 
   const handleViewResponse = (response) => {
@@ -53,24 +65,26 @@ const ResponseView = () => {
     setApprovingResponse(response);
     // Initialize field approvals based on current state
     const initialApprovals = {};
-    form.fields.forEach(field => {
-      if (field.needsApproval) {
-        // Parse the field value to get current approval status
-        let isApproved = false;
-        try {
-          const value = response.values[field.id];
-          if (value && typeof value === 'object') {
-            isApproved = value.isApproved || false;
-          } else if (typeof value === 'string' && value.startsWith('{')) {
-            const parsed = JSON.parse(value);
-            isApproved = parsed.isApproved || false;
+    if (form && form.fields) {
+      form.fields.forEach(field => {
+        if (field.needsApproval) {
+          // Parse the field value to get current approval status
+          let isApproved = false;
+          try {
+            const value = response.values[field.id];
+            if (value && typeof value === 'object') {
+              isApproved = value.isApproved || false;
+            } else if (typeof value === 'string' && value.startsWith('{')) {
+              const parsed = JSON.parse(value);
+              isApproved = parsed.isApproved || false;
+            }
+          } catch (e) {
+            console.error('Error parsing field value:', e);
           }
-        } catch (e) {
-          console.error('Error parsing field value:', e);
+          initialApprovals[field.id] = isApproved;
         }
-        initialApprovals[field.id] = isApproved;
-      }
-    });
+      });
+    }
     setFieldApprovals(initialApprovals);
     setIsApproveModalOpen(true);
   };
@@ -89,7 +103,8 @@ const ResponseView = () => {
       setResponses(prev => prev.filter(r => r.id !== deletingResponse.id));
     } catch (err) {
       console.error('Error deleting response:', err);
-      toast.error('Failed to delete response');
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to delete response';
+      toast.error(errorMsg);
     }
   };
   
@@ -117,7 +132,8 @@ const ResponseView = () => {
       setResponses(refreshedResponses);
     } catch (err) {
       console.error('Error updating approval status:', err);
-      toast.error('Failed to update approval status');
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to update approval status';
+      toast.error(errorMsg);
     }
   };
 
@@ -140,7 +156,7 @@ const ResponseView = () => {
   };
   
   // Check if the form has any fields that need approval
-  const hasApprovalFields = form.fields.some(field => field.needsApproval);
+  const hasApprovalFields = form && form.fields ? form.fields.some(field => field.needsApproval) : false;
 
   if (loading) {
     return <LoadingSpinner />;
@@ -215,7 +231,7 @@ const ResponseView = () => {
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Submission Date
                 </th>
-                {form.fields.map(field => (
+                {form && form.fields && form.fields.map(field => (
                   <th key={field.id} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {field.name}
                     {field.needsApproval && <span className="ml-1 text-xs text-blue-500">(Needs Approval)</span>}
@@ -232,7 +248,7 @@ const ResponseView = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(response.submittedAt).toLocaleString()}
                   </td>
-                  {form.fields.map(field => (
+                  {form && form.fields && form.fields.map(field => (
                     <td key={`${response.id}-${field.id}`} className="px-6 py-4 text-sm text-gray-500">
                       {formatValue(field, response.values[field.id])}
                       {field.needsApproval && (
@@ -286,7 +302,7 @@ const ResponseView = () => {
             <h3 className="text-lg font-medium mb-4">Submitted on {new Date(selectedResponse.submittedAt).toLocaleString()}</h3>
             
             <div className="space-y-4">
-              {form.fields.map(field => {
+              {form && form.fields && form.fields.map(field => {
                 // Skip rendering fields that need approval but aren't approved
                 if (field.needsApproval && !checkApprovalStatus(field, selectedResponse.values[field.id])) {
                   return null;
@@ -319,7 +335,15 @@ const ResponseView = () => {
                           {(() => {
                             try {
                               if (displayValue && displayValue.content) {
-                                return <div dangerouslySetInnerHTML={{ __html: displayValue.content.blocks?.map(b => b.text).join('<br/>') || '' }} />;
+                                return <div dangerouslySetInnerHTML={{ 
+                                  __html: displayValue.content.blocks?.map(b => {
+                                    // Basic XSS protection for user-generated content
+                                    const text = String(b.text || '')
+                                      .replace(/</g, '&lt;')
+                                      .replace(/>/g, '&gt;');
+                                    return text;
+                                  }).join('<br/>') || '' 
+                                }} />;
                               }
                               return <p>{String(displayValue)}</p>;
                             } catch (e) {
@@ -359,7 +383,7 @@ const ResponseView = () => {
             <h3 className="text-lg font-medium mb-4">Manage Approvals</h3>
             
             <div className="space-y-4">
-              {form.fields.filter(field => field.needsApproval).map(field => (
+              {form && form.fields && form.fields.filter(field => field.needsApproval).map(field => (
                 <div key={field.id} className="flex items-center justify-between p-2 border rounded">
                   <div className="flex-1 mr-4">
                     <span className="font-medium">{field.name}</span>
