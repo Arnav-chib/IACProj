@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { listForms } from '../../services/formService';
+import { getForms } from '../../services/formService';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Button from '../common/Button';
 
@@ -13,7 +13,7 @@ const FormList = () => {
     const fetchForms = async () => {
       try {
         setLoading(true);
-        const formList = await listForms();
+        const formList = await getForms();
         setForms(formList);
       } catch (err) {
         console.error('Error fetching forms:', err);

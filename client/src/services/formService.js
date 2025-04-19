@@ -63,5 +63,7 @@ export default {
   createForm,
   updateForm,
   deleteForm,
-  getFormResponses
+  getFormResponses,
+  submitResponse,
+  getFormAnalytics
 };
