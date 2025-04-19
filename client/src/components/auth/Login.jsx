@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
-import { login } from '../../services/authService';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 
 const Login = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login: authLogin } = useAuth();
+  const { login } = useAuth();
 
   const validationSchema = Yup.object({
     email: Yup.string()
@@ -22,11 +21,16 @@ const Login = () => {
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
       setError('');
-      const response = await login(values);
-      authLogin(response);
-      navigate('/dashboard');
+      const result = await login(values);
+      
+      if (result && !result.success) {
+        setError(result.error || 'Failed to login');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to login');
+      console.error('Login error:', err);
+      setError(err.response?.data?.error || 'Failed to login. Please check your connection and try again.');
     } finally {
       setSubmitting(false);
     }

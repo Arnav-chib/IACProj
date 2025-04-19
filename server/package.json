@@ -11,7 +11,8 @@
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "migrate": "node src/db/migrations/run.js",
-    "seed": "node src/db/seeds/run.js"
+    "seed": "node src/db/seeds/run.js",
+    "fix-admin": "node src/scripts/fixAdminSchema.js"
   },
   "keywords": [],
   "author": "",

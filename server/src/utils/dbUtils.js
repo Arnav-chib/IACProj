@@ -117,7 +117,44 @@ async function initializeMasterDb(pool) {
 // Initialize tenant database tables
 async function initializeTenantDb(connectionString) {
   try {
-    const tenantPool = await getTenantDbConnection(connectionString);
+    let tenantPool;
+    
+    // Handle different formats of connection string
+    if (typeof connectionString === 'string') {
+      try {
+        // Try to parse it as JSON
+        const config = JSON.parse(connectionString);
+        
+        // If this includes a schema property, we need to remember it for later use
+        const schema = config.schema;
+        
+        // Get a connection to the database
+        tenantPool = await getTenantDbConnection(connectionString);
+        
+        // If we have a schema specified, make sure it exists
+        if (schema) {
+          await tenantPool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '${schema}')
+            BEGIN
+              EXEC('CREATE SCHEMA [${schema}]')
+            END
+          `);
+          
+          // Set default schema for this connection
+          await tenantPool.request().query(`
+            USE [${config.database}];
+            GO
+            ALTER USER [${config.user}] WITH DEFAULT_SCHEMA = [${schema}];
+          `);
+        }
+      } catch (e) {
+        // If parsing fails, use the string as is
+        tenantPool = await getTenantDbConnection(connectionString);
+      }
+    } else {
+      // If it's already an object, use it directly
+      tenantPool = await getTenantDbConnection(JSON.stringify(connectionString));
+    }
     
     // Check if tables already exist
     const checkResult = await tenantPool.request()
@@ -135,6 +172,7 @@ async function initializeTenantDb(connectionString) {
     const schemaPath = path.join(__dirname, '../../db/tenantSchema.sql');
     const schemaScript = await fs.readFile(schemaPath, 'utf8');
     
+    logger.info('Initializing tenant database schema with SQL script');
     await tenantPool.request().batch(schemaScript);
     logger.info('Tenant database schema initialized successfully');
   } catch (error) {

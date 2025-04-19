@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
-import { register } from '../../services/authService';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 
 const Register = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login: authLogin } = useAuth();
+  const { register } = useAuth();
 
   const validationSchema = Yup.object({
     username: Yup.string()
@@ -30,11 +29,16 @@ const Register = () => {
     try {
       setError('');
       const { confirmPassword, ...registerData } = values;
-      const response = await register(registerData);
-      authLogin(response);
-      navigate('/dashboard');
+      const result = await register(registerData);
+      
+      if (result && !result.success) {
+        setError(result.error || 'Failed to register');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to register');
+      console.error('Registration error:', err);
+      setError(err.response?.data?.error || 'Failed to register. Please try again.');
     } finally {
       setSubmitting(false);
     }

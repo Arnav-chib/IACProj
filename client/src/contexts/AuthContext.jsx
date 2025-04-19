@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import apiService from '../services/api';
 import { toast } from 'react-toastify';
+import logger from '../utils/logger';
 
 const AuthContext = createContext();
 
@@ -40,17 +41,49 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
+      logger.logToConsole('Login attempt with:', credentials.email);
+      
+      // Clear any previous errors
+      setError(null);
+      
       const response = await apiService.login(credentials);
       const { token, user } = response;
+      
+      if (!token || !user) {
+        setError('Invalid response from server - missing token or user data');
+        return { 
+          success: false, 
+          error: 'Login failed - server returned incomplete data' 
+        };
+      }
+      
       localStorage.setItem('token', token);
       setCurrentUser(user);
-      setError(null);
-      return { success: true };
+      
+      logger.logToConsole('Login successful for:', user.email);
+      
+      return { success: true, user };
     } catch (error) {
-      setError('Login failed. Please check your credentials.');
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message ||
+                          error.message || 
+                          'Unable to connect to server';
+                          
+      logger.logToConsole('Login error:', errorMessage);
+      
+      // Set a user-friendly error message
+      setError(
+        error.response?.status === 401 
+          ? 'Login failed. Please check your credentials.' 
+          : error.response?.status >= 500 
+            ? 'Server error. Please try again later.'
+            : `Login failed: ${errorMessage}`
+      );
+      
       return {
         success: false,
-        error: error.response?.data?.error || 'Login failed'
+        error: errorMessage,
+        status: error.response?.status
       };
     }
   };

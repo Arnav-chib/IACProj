@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Formik, Form, Field, ErrorMessage } from 'formik';
 import * as Yup from 'yup';
-import { requestPasswordReset } from '../../services/authService';
+import { useAuth } from '../../contexts/AuthContext';
 import Button from '../common/Button';
 
 const ForgotPassword = () => {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const { forgotPassword } = useAuth();
 
   const validationSchema = Yup.object({
     email: Yup.string()
@@ -18,10 +19,16 @@ const ForgotPassword = () => {
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
       setError('');
-      await requestPasswordReset(values.email);
-      setSubmitted(true);
+      const result = await forgotPassword(values.email);
+      
+      if (result && !result.success) {
+        setError(result.error || 'Failed to send reset email');
+      } else {
+        setSubmitted(true);
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send reset email');
+      console.error('Password reset request error:', err);
+      setError(err.response?.data?.error || 'Failed to send reset email. Please try again.');
     } finally {
       setSubmitting(false);
     }
