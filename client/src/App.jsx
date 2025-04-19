@@ -87,10 +87,8 @@ const AppContent = () => {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/forms/:formId" element={<FormRenderer />} />
               <Route path="/about" element={<AboutUs />} />
-              <Route path="/blog" element={<BlogList />} />
-              <Route path="/blog/:slug" element={<BlogDetail />} />
               
-              {/* Admin only routes */}
+              {/* Admin only routes - MOVED ABOVE slug route to prevent matching issues */}
               <Route 
                 path="/blog/new" 
                 element={
@@ -107,6 +105,10 @@ const AppContent = () => {
                   </AdminRoute>
                 } 
               />
+              
+              {/* Blog routes - these must come AFTER the specific routes */}
+              <Route path="/blog" element={<BlogList />} />
+              <Route path="/blog/:slug" element={<BlogDetail />} />
               
               {/* Protected routes */}
               <Route 

@@ -40,17 +40,22 @@ const ShareForm = () => {
   }, [formId]);
 
   const getPublicFormUrl = () => {
-    // Get the base URL from environment variables if available, otherwise use window.location.origin
-    // This ensures the URL works across different devices
-    const baseUrl = process.env.REACT_APP_PUBLIC_URL || window.location.origin;
-    
-    // If running locally, warn about potential cross-device issues
-    if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
-      console.warn('Warning: Using localhost URL which may not be accessible from other devices. ' +
-                  'Set REACT_APP_PUBLIC_URL in your .env file to use a public URL.');
+    // First try to use the environment variable if set
+    if (process.env.REACT_APP_PUBLIC_URL) {
+      return `${process.env.REACT_APP_PUBLIC_URL}/forms/${formId}`;
     }
     
-    return `${baseUrl}/forms/${formId}`;
+    // For local development, try to use the local IP if on same network
+    const origin = window.location.origin;
+    
+    // If already using IP address rather than localhost, it might work on same network
+    if (origin.match(/^https?:\/\/\d+\.\d+\.\d+\.\d+/)) {
+      console.log('Using IP address for sharing:', origin);
+      return `${origin}/forms/${formId}`;
+    }
+    
+    // When localhost is used, show the warning but still provide the URL
+    return `${origin}/forms/${formId}`;
   };
 
   const getEmbedCode = () => {
@@ -114,11 +119,18 @@ const ShareForm = () => {
       {usingLocalhost && (
         <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
           <p className="font-bold">Local Development Warning</p>
-          <p>You are sharing from a localhost environment. The form will not be accessible from other devices unless:</p>
+          <p>You are sharing from a localhost environment. The form may not be accessible from other devices because:</p>
           <ul className="list-disc pl-5 mt-2">
-            <li>You configure REACT_APP_PUBLIC_URL in your .env file with a public URL</li>
-            <li>You deploy your application to a publicly accessible server</li>
-            <li>You set up port forwarding or a tunnel service (like ngrok)</li>
+            <li>Localhost (127.0.0.1) only refers to the current device, not accessible from other devices</li>
+            <li>Using your device's local IP address (like 192.168.x.x) works only for devices on the same network</li>
+            <li>Firewalls and security settings may block incoming connections</li>
+            <li>The server needs CORS configured to accept requests from external origins</li>
+          </ul>
+          <p className="mt-2">Alternatives:</p>
+          <ul className="list-disc pl-5">
+            <li>Configure <code>REACT_APP_PUBLIC_URL</code> in your .env file with your local IP address</li>
+            <li>Use ngrok to create a secure tunnel to your localhost</li>
+            <li>Deploy your application to a public hosting service</li>
           </ul>
         </div>
       )}

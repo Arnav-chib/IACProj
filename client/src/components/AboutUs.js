@@ -39,12 +39,16 @@ const AboutUs = () => {
 
   const handleSave = async () => {
     try {
-      await api.put('/system/about', { content });
+      console.log('Updating About Us content...');
+      const response = await api.put('/system/about', { content });
+      console.log('Update response:', response);
       setIsEditing(false);
       toast.success('About Us content updated successfully');
     } catch (error) {
       console.error('Error updating About Us content:', error);
-      toast.error('Failed to update About Us content');
+      console.error('Response status:', error.response?.status);
+      console.error('Response data:', error.response?.data);
+      toast.error(`Failed to update About Us content: ${error.response?.data?.message || error.message}`);
     }
   };
 

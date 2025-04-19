@@ -118,17 +118,25 @@ const BlogForm = () => {
     setIsSubmitting(true);
     
     try {
+      console.log('Submitting blog post:', formData);
       if (isEditMode) {
-        await axios.put(`/api/system/blog/${id}`, formData);
+        // Make sure we're using the correct endpoint format
+        const response = await axios.put(`/api/system/blog/${id}`, formData);
+        console.log('Blog update response:', response);
         toast.success('Blog post updated successfully');
       } else {
-        await axios.post('/api/system/blog', formData);
+        // Make sure we're using the correct endpoint format
+        const response = await axios.post('/api/system/blog', formData);
+        console.log('Blog create response:', response);
         toast.success('Blog post created successfully');
       }
       navigate('/blog');
     } catch (error) {
       console.error('Error saving blog post:', error);
-      toast.error(error.response?.data?.message || 'Failed to save blog post');
+      console.error('API endpoint:', isEditMode ? `/api/system/blog/${id}` : '/api/system/blog');
+      console.error('Response status:', error.response?.status);
+      console.error('Response data:', error.response?.data);
+      toast.error(error.response?.data?.message || 'Failed to save blog post. Please check the console for details.');
     } finally {
       setIsSubmitting(false);
     }
