@@ -22,25 +22,9 @@ async function seedMasterUser() {
             connectionInfo = existingUser.DBConnectionString;
           }
           
-          // If this is just schema info and not a full connection string, generate a proper one
-          if (connectionInfo.schemaName && !connectionInfo.server) {
-            const pool = getPool();
-            const config = await pool.config;
-            // Create a proper connection string using the master database config but with the schema name
-            const dbConfig = {
-              server: config.server,
-              database: config.database,
-              user: config.user,
-              password: config.password,
-              options: config.options,
-              schema: connectionInfo.schemaName
-            };
-            
-            // Initialize tenant tables using this connection config
-            const connectionString = JSON.stringify(dbConfig);
-            await initializeTenantDb(connectionString);
-            logger.info('Initialized tenant tables for existing admin user');
-          }
+          // Initialize tenant tables using this connection info
+          await initializeTenantDb(typeof connectionInfo === 'object' ? JSON.stringify(connectionInfo) : connectionInfo);
+          logger.info('Initialized tenant tables for existing admin user');
         } catch (err) {
           logger.error('Error initializing tenant tables for existing admin user:', {
             error: err.message,
@@ -120,7 +104,7 @@ async function seedMasterUser() {
           WHERE UserID = @userId
         `);
       
-      // Initialize the tenant tables in this schema
+      // Initialize the tenant tables in this schema - CRITICAL STEP
       await initializeTenantDb(connectionString);
       
       logger.logToConsole(`Created and initialized schema for admin user: ${user.UserID}, schema: ${schemaName}`);

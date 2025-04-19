@@ -12,7 +12,8 @@
     "lint:fix": "eslint . --ext .js --fix",
     "migrate": "node src/db/migrations/run.js",
     "seed": "node src/db/seeds/run.js",
-    "fix-admin": "node src/scripts/fixAdminSchema.js"
+    "fix-admin": "node src/scripts/fixAdminSchema.js",
+    "setup-promises-form": "node src/db/seeds/setupPromisesForm.js"
   },
   "keywords": [],
   "author": "",
