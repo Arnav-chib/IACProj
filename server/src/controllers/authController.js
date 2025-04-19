@@ -111,27 +111,7 @@ const {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
       
-      // Special handling for admin user
-      if (email === 'admin@gmail.com' && password === 'admin123') {
-        logger.logToConsole('Admin direct login successful');
-        
-        // Generate JWT token for admin
-        const token = generateToken({ userId: user.UserID });
-        
-        return res.json({
-          message: 'Login successful',
-          token,
-          user: {
-            id: user.UserID,
-            username: user.Username || 'admin',
-            email: user.Email,
-            isSystemAdmin: true,
-            orgId: user.OrgID
-          }
-        });
-      }
-      
-      // Verify password
+      // Verify password - this applies to all users including admin
       const isPasswordValid = await comparePassword(password, user.PasswordHash);
       if (!isPasswordValid) {
         logger.logToConsole(`Login failed: Invalid password for ${email}`);
@@ -168,20 +148,7 @@ const {
     try {
       const user = req.user;
       
-      // Special case for admin account
-      if (user.Email === 'admin@gmail.com') {
-        return res.json({
-          user: {
-            id: user.UserID,
-            username: user.Username || 'admin',
-            email: user.Email,
-            isSystemAdmin: true,
-            isOrgAdmin: user.IsOrgAdmin,
-            orgId: user.OrgID
-          }
-        });
-      }
-      
+      // Return user information consistently - no special cases
       res.json({
         user: {
           id: user.UserID,

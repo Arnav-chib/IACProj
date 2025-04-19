@@ -271,7 +271,18 @@ function isSystemAdmin(req, res, next) {
       ));
     }
     
-    if (req.user.Role !== 'admin') {
+    // Debug the user object to see what properties are actually available
+    console.log('User object in isSystemAdmin check:', {
+      id: req.user.id || req.user.UserID || req.user.userId,
+      isSystemAdmin: req.user.isSystemAdmin,
+      IsSystemAdmin: req.user.IsSystemAdmin
+    });
+    
+    // Since there's no role column in the database, only check isSystemAdmin flag
+    // Check both camelCase and PascalCase variations
+    const isAdmin = req.user.isSystemAdmin === true || req.user.IsSystemAdmin === true;
+    
+    if (!isAdmin) {
       return next(new AppError(
         'System administrator access required', 
         403, 
@@ -308,8 +319,20 @@ function isOrgAdmin(req, res, next) {
       ));
     }
     
-    // Check if user is an organization admin
-    const isAdmin = req.user.Role === 'org_admin' || req.user.Role === 'admin';
+    // Debug the user object to see what properties are actually available
+    console.log('User object in isOrgAdmin check:', {
+      id: req.user.id || req.user.UserID || req.user.userId,
+      isOrgAdmin: req.user.isOrgAdmin,
+      IsOrgAdmin: req.user.IsOrgAdmin,
+      isSystemAdmin: req.user.isSystemAdmin // System admins should have org admin access too
+    });
+    
+    // Check for isOrgAdmin property (or variations) or isSystemAdmin
+    const isAdmin = 
+      req.user.isOrgAdmin === true || 
+      req.user.IsOrgAdmin === true || 
+      req.user.isSystemAdmin === true || 
+      req.user.IsSystemAdmin === true;
     
     if (!isAdmin) {
       return next(new AppError(
@@ -351,8 +374,8 @@ async function hasOrgAccess(req, res, next) {
       ));
     }
 
-    // System admin has access to all organizations
-    if (req.user.IsSystemAdmin) {
+    // System admin has access to all organizations (check both camelCase and PascalCase)
+    if (req.user.isSystemAdmin === true || req.user.IsSystemAdmin === true) {
       return next();
     }
 

@@ -26,9 +26,11 @@ const BlogList = () => {
 
     fetchBlogPosts();
     
-    // Debugging logs with safe access
-    console.log('Current user in BlogList:', currentUser || 'Not authenticated');
-    console.log('Is system admin in BlogList?', currentUser?.isSystemAdmin || false);
+    // Simplified debugging focused on isSystemAdmin property
+    console.log('Current user in BlogList:', {
+      isAuthenticated: !!currentUser,
+      isSystemAdmin: currentUser?.isSystemAdmin
+    });
   }, [currentUser]);
 
   const formatDate = (dateString) => {

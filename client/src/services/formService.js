@@ -83,6 +83,19 @@ export const getFormResponses = async (formId) => {
   }
 };
 
+// Delete a specific form response
+export const deleteFormResponse = async (formId, responseId) => {
+  console.log(`Deleting response ${responseId} from form ${formId}...`);
+  try {
+    const response = await api.delete(`/forms/${formId}/responses/${responseId}`);
+    console.log('Delete response result:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error deleting response ${responseId} from form ${formId}:`, error);
+    throw error;
+  }
+};
+
 // Get form analytics
 export const getFormAnalytics = async (formId) => {
   try {

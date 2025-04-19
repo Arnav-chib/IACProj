@@ -21,6 +21,7 @@ const AboutUs = lazy(() => import('./components/AboutUs'));
 const BlogList = lazy(() => import('./components/blog/BlogList'));
 const BlogDetail = lazy(() => import('./components/blog/BlogDetail'));
 const BlogForm = lazy(() => import('./components/blog/BlogForm'));
+const AnalyticsView = lazy(() => import('./components/dashboard/AnalyticsView'));
 
 // Loading component for suspense fallback
 const LoadingFallback = () => (
@@ -132,6 +133,14 @@ const AppContent = () => {
                 element={
                   <ProtectedRoute>
                     <ResponseView />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/dashboard/forms/:formId/analytics" 
+                element={
+                  <ProtectedRoute>
+                    <AnalyticsView />
                   </ProtectedRoute>
                 } 
               />

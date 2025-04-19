@@ -35,11 +35,8 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Invalid authentication response');
       }
       
-      // Ensure user object has all required properties
-      const user = {
-        ...response.user,
-        isSystemAdmin: !!response.user.isSystemAdmin  // Ensure boolean value
-      };
+      // Set the current user directly from the response without special cases
+      const user = response.user;
       
       console.log('Setting current user:', user);
       setCurrentUser(user);

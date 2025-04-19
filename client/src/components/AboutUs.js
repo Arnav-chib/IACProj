@@ -16,9 +16,12 @@ const AboutUs = () => {
   useEffect(() => {
     fetchAboutUs();
     
-    // Debugging logs with safe access
-    console.log('Current user:', currentUser || 'Not authenticated');
-    console.log('Is system admin?', currentUser?.isSystemAdmin || false);
+    // Simplified debugging focused only on isSystemAdmin which is what we use
+    console.log('Current user object:', JSON.stringify({
+      id: currentUser?.id,
+      email: currentUser?.email,
+      isSystemAdmin: currentUser?.isSystemAdmin
+    }, null, 2));
   }, [currentUser]); // Add currentUser as dependency
 
   const fetchAboutUs = async () => {

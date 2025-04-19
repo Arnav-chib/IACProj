@@ -6,10 +6,14 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
 const BlogForm = () => {
-  const { action, id } = useParams(); // action can be 'new' or 'edit', id is contentId
+  // Extract id directly from params without expecting action
+  const { id } = useParams();
   const navigate = useNavigate();
-  const isEditMode = action === 'edit';
+  // Check if we're in edit mode based on the existence of id
+  const isEditMode = !!id;
   const quillRef = useRef(null);
+  
+  console.log('BlogForm params:', { id, isEditMode });
   
   const [formData, setFormData] = useState({
     title: '',
@@ -119,24 +123,36 @@ const BlogForm = () => {
     
     try {
       console.log('Submitting blog post:', formData);
+      
+      // Use the api object from services/api.js to ensure correct base URL and headers
       if (isEditMode) {
         // Make sure we're using the correct endpoint format
         const response = await axios.put(`/api/system/blog/${id}`, formData);
         console.log('Blog update response:', response);
         toast.success('Blog post updated successfully');
       } else {
-        // Make sure we're using the correct endpoint format
+        // Make sure we're using the correct endpoint format 
         const response = await axios.post('/api/system/blog', formData);
         console.log('Blog create response:', response);
         toast.success('Blog post created successfully');
       }
+      
       navigate('/blog');
     } catch (error) {
       console.error('Error saving blog post:', error);
       console.error('API endpoint:', isEditMode ? `/api/system/blog/${id}` : '/api/system/blog');
       console.error('Response status:', error.response?.status);
       console.error('Response data:', error.response?.data);
-      toast.error(error.response?.data?.message || 'Failed to save blog post. Please check the console for details.');
+      
+      // Provide more helpful error message based on status code
+      let errorMessage = 'Failed to save blog post.';
+      if (error.response?.status === 404) {
+        errorMessage = 'API endpoint not found. Please check server routes configuration.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
