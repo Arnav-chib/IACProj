@@ -120,25 +120,29 @@ async function createUser(userData) {
       request.input('lastName', sql.NVarChar, userData.lastName);
     }
     
+    // Check for role/usertype field
     if (availableColumns.has('role') && userData.role) {
       fieldNames.push('Role');
       valueParams.push('@role');
       request.input('role', sql.NVarChar, userData.role);
+    } else if (availableColumns.has('usertype') && userData.role) {
+      fieldNames.push('UserType');
+      valueParams.push('@userType');
+      request.input('userType', sql.NVarChar, userData.role);
     }
     
-    // Remove Status check as this column doesn't exist
-    // Add subscriptionStatus check which does exist in the schema
+    // Check for system admin field
+    if (availableColumns.has('issystemadmin') && userData.isSystemAdmin !== undefined) {
+      fieldNames.push('IsSystemAdmin');
+      valueParams.push('@isSystemAdmin');
+      request.input('isSystemAdmin', sql.Bit, userData.isSystemAdmin ? 1 : 0);
+    }
+    
+    // Check for subscription status
     if (availableColumns.has('subscriptionstatus') && userData.subscriptionStatus) {
       fieldNames.push('SubscriptionStatus');
       valueParams.push('@subscriptionStatus');
       request.input('subscriptionStatus', sql.NVarChar, userData.subscriptionStatus);
-    }
-    
-    // Add system admin field if it exists
-    if (availableColumns.has('issystemadmin') && userData.isSystemAdmin) {
-      fieldNames.push('IsSystemAdmin');
-      valueParams.push('@isSystemAdmin');
-      request.input('isSystemAdmin', sql.Bit, userData.isSystemAdmin ? 1 : 0);
     }
     
     // Add connection string if it exists

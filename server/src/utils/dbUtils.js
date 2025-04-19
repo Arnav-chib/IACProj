@@ -22,6 +22,21 @@ async function initializeMasterDb(pool) {
     if (tableResult.recordset[0].count > 0) {
       logger.info('Master database schema already exists');
       
+      // Get column information to understand the actual schema
+      const columnsResult = await pool.request().query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = 'Users'
+      `);
+      
+      // Create a set of available columns
+      const availableColumns = new Set();
+      columnsResult.recordset.forEach(col => {
+        availableColumns.add(col.COLUMN_NAME.toLowerCase());
+      });
+      
+      logger.logToConsole('Available columns in Users table:', Array.from(availableColumns));
+      
       // Verify admin user exists
       const adminCheck = await pool.request().query(`
         SELECT COUNT(*) as count FROM Users WHERE Email = 'admin@gmail.com'
@@ -31,10 +46,39 @@ async function initializeMasterDb(pool) {
         // Create admin user if it doesn't exist
         const hashedPassword = '$2b$10$RzNvbW5I7qqvGPNKPfduweK6dKdSfqP8YBNL5M8aK4IbXJbX3PhBC'; // admin123
         
-        await pool.request().query(`
-          INSERT INTO Users (Email, PasswordHash, FirstName, LastName, Role, IsSystemAdmin)
-          VALUES ('admin@gmail.com', '${hashedPassword}', 'Admin', 'User', 'admin', 1)
-        `);
+        // Build query dynamically based on available columns
+        const fieldNames = ['Email', 'PasswordHash', 'FirstName', 'LastName'];
+        const values = ["'admin@gmail.com'", `'${hashedPassword}'`, "'Admin'", "'User'"];
+        
+        // Add optional columns if they exist
+        if (availableColumns.has('username')) {
+          fieldNames.push('Username');
+          values.push("'admin'");
+        }
+        
+        if (availableColumns.has('issystemadmin')) {
+          fieldNames.push('IsSystemAdmin');
+          values.push('1');
+        }
+        
+        if (availableColumns.has('usertype')) {
+          fieldNames.push('UserType');
+          values.push("'admin'");
+        }
+        
+        if (availableColumns.has('roleid')) {
+          fieldNames.push('RoleID');
+          values.push('1'); // Assuming 1 is admin role
+        }
+        
+        // Build and execute the query
+        const insertQuery = `
+          INSERT INTO Users (${fieldNames.join(', ')})
+          VALUES (${values.join(', ')})
+        `;
+        
+        logger.logToConsole('Inserting admin user with query:', insertQuery);
+        await pool.request().query(insertQuery);
         
         logger.logToConsole('Admin user created during initialization check');
       }
@@ -54,7 +98,7 @@ async function initializeMasterDb(pool) {
         PasswordHash NVARCHAR(255) NOT NULL,
         FirstName NVARCHAR(100),
         LastName NVARCHAR(100),
-        Role NVARCHAR(50) NOT NULL DEFAULT 'user',
+        UserType NVARCHAR(50) NOT NULL DEFAULT 'user',
         IsSystemAdmin BIT NOT NULL DEFAULT 0,
         IsOrgAdmin BIT NOT NULL DEFAULT 0,
         OrgID INT NULL,
@@ -71,7 +115,7 @@ async function initializeMasterDb(pool) {
     const hashedPassword = '$2b$10$RzNvbW5I7qqvGPNKPfduweK6dKdSfqP8YBNL5M8aK4IbXJbX3PhBC'; // admin123
     
     await pool.request().query(`
-      INSERT INTO Users (Email, Username, PasswordHash, FirstName, LastName, Role, IsSystemAdmin)
+      INSERT INTO Users (Email, Username, PasswordHash, FirstName, LastName, UserType, IsSystemAdmin)
       VALUES ('admin@gmail.com', 'admin', '${hashedPassword}', 'Admin', 'User', 'admin', 1)
     `);
     

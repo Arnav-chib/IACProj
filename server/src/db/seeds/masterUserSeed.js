@@ -10,6 +10,22 @@ async function seedMasterUser() {
       return;
     }
 
+    // Get column information to understand the schema
+    const pool = getPool();
+    const columnsResult = await pool.request().query(`
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'Users'
+    `);
+    
+    // Create a set of available columns
+    const availableColumns = new Set();
+    columnsResult.recordset.forEach(col => {
+      availableColumns.add(col.COLUMN_NAME.toLowerCase());
+    });
+    
+    logger.logToConsole('Available columns in Users table (seed):', Array.from(availableColumns));
+
     // Create master user with required fields
     const masterUser = {
       username: 'admin',
@@ -28,9 +44,6 @@ async function seedMasterUser() {
     
     // For master user, create a schema in the master database
     try {
-      // Get the database pool
-      const pool = getPool();
-      
       // Create a schema for this user in the master database
       const schemaName = `User_${user.UserID}_Schema`;
       

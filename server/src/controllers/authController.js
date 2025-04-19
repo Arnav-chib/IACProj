@@ -31,23 +31,43 @@ const {
         return res.status(400).json({ error: 'User with this email already exists' });
       }
       
+      // Get column information for Users table
+      const pool = await initMasterPool();
+      const columnsResult = await pool.request().query(`
+        SELECT COLUMN_NAME 
+        FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = 'Users'
+      `);
+      
+      // Create a set of available columns
+      const availableColumns = new Set();
+      columnsResult.recordset.forEach(col => {
+        availableColumns.add(col.COLUMN_NAME.toLowerCase());
+      });
+      
+      logger.logToConsole('Available columns for registration:', Array.from(availableColumns));
+      
+      // Prepare user data based on available columns
+      const userData = { 
+        username, 
+        email, 
+        password,
+        role: 'user'  // Will be mapped to UserType if Role doesn't exist
+      };
+      
       // First create the user without a database connection string
       // We need the user ID to create a proper database name
-      const userData = { username, email, password };
-      const userId = await createUser(userData);
-      
-      // Initialize master pool if not already done
-      const pool = await initMasterPool();
+      const user = await createUser(userData);
       
       // Generate a unique database name for this user
-      const dbName = generateTenantDatabaseName('User', userId);
+      const dbName = generateTenantDatabaseName('User', user.UserID);
       
       // Create a new database for this user and get the connection string
       const connectionString = await createTenantDatabase(pool, dbName);
       
       // Update the user with the connection string
       await pool.request()
-        .input('userId', userId)
+        .input('userId', user.UserID)
         .input('dbConnectionString', connectionString)
         .query(`
           UPDATE Users 
@@ -55,16 +75,16 @@ const {
           WHERE UserID = @userId
         `);
       
-      logger.info(`Created new database for user: ${userId}, database: ${dbName}`);
+      logger.info(`Created new database for user: ${user.UserID}, database: ${dbName}`);
       
       // Generate JWT token
-      const token = generateToken({ userId });
+      const token = generateToken({ userId: user.UserID });
       
       res.status(201).json({
         message: 'User registered successfully',
         token,
         user: {
-          id: userId,
+          id: user.UserID,
           username,
           email
         }
