@@ -12,6 +12,7 @@ const formRoutes = require('../routes/formRoutes');
 const tokenRoutes = require('../routes/tokenRoutes');
 const embedRoutes = require('../routes/embedRoutes');
 const healthRoutes = require('../routes/healthRoutes');
+const systemContentRoutes = require('../routes/systemContentRoutes');
 const limiters = require('../middleware/rateLimit');
 const requestLogger = require('../middleware/requestLogger');
 const csrfProtection = require('../middleware/csrfProtection');
@@ -99,6 +100,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/embed', embedRoutes);
+app.use('/api/system', systemContentRoutes);
 
 // Error handling middleware
 app.use(errorHandler);

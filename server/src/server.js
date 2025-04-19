@@ -5,6 +5,7 @@ const { initializeMasterDbPool } = require('./config/database');
 const { initializeMasterDb } = require('./utils/dbUtils');
 const { setPool } = require('./models/userModel');
 const { setPool: setOrgPool } = require('./models/orgModel');
+const { setPool: setSystemContentPool } = require('./models/systemContentModel');
 const { scheduleTokenCleanup } = require('./services/tokenService');
 const routes = require('./routes');
 const logger = require('./utils/logger');
@@ -65,6 +66,9 @@ async function startServer() {
     
     // Set pool for organization model
     setOrgPool(masterPool);
+    
+    // Set pool for system content model
+    setSystemContentPool(masterPool);
     
     // Check if required tables exist before scheduling token cleanup
     const tableCheckResult = await masterPool.request().query(`

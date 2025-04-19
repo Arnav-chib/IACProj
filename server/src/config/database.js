@@ -1,13 +1,26 @@
 const sql = require('mssql');
 const dotenv = require('dotenv');
+const path = require('path');
 const logger = require('../utils/logger');
 
-dotenv.config();
+// Configure dotenv with absolute path to ensure it works regardless of where script is executed from
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 /**
  * Parse database configuration safely
  */
 const parseDatabaseConfig = (connectionString) => {
+  // If connectionString is undefined or null, use the environment variable directly
+  if (!connectionString) {
+    connectionString = process.env.DB_CONNECTION_STRING;
+    
+    // If still undefined, throw a more helpful error
+    if (!connectionString) {
+      logger.error('Database connection string is missing. Check your .env file.');
+      throw new Error('Database connection string is missing. Check your .env file.');
+    }
+  }
+  
   try {
     // Try to parse as JSON first
     return JSON.parse(connectionString);
@@ -49,7 +62,8 @@ const parseDatabaseConfig = (connectionString) => {
     } catch (parseError) {
       logger.error('Failed to parse database connection string:', {
         error: parseError.message,
-        original: error.message
+        original: error.message,
+        timestamp: new Date().toISOString()
       });
       throw new Error('Invalid database connection format');
     }

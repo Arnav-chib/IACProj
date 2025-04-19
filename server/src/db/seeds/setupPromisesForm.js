@@ -35,17 +35,26 @@ async function setupPromisesForm() {
     // Parse the connection info - it might be a JSON string or already a JSON object
     let connectionInfo;
     try {
-      connectionInfo = typeof adminUser.DBConnectionString === 'string' 
-        ? JSON.parse(adminUser.DBConnectionString) 
-        : adminUser.DBConnectionString;
+      if (typeof adminUser.DBConnectionString === 'string') {
+        try {
+          connectionInfo = JSON.parse(adminUser.DBConnectionString);
+        } catch (e) {
+          // If it's not valid JSON, use it as-is
+          connectionInfo = adminUser.DBConnectionString;
+        }
+      } else {
+        connectionInfo = adminUser.DBConnectionString;
+      }
     } catch (e) {
       logger.error('Error parsing connection string:', e);
-      connectionInfo = adminUser.DBConnectionString;
+      // Fallback to environment connection as a last resort
+      logger.info('Falling back to environment connection string');
+      connectionInfo = process.env.DB_CONNECTION_STRING;
     }
     
     // Connect to the tenant database
     const tenantPool = await getTenantDbConnection(
-      typeof connectionInfo === 'object' ? JSON.stringify(connectionInfo) : adminUser.DBConnectionString
+      typeof connectionInfo === 'object' ? JSON.stringify(connectionInfo) : connectionInfo
     );
     
     // First check if FormMaster exists in the dbo schema
