@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Editor } from '@tinymce/tinymce-react';
+import { api } from '../services/api';
 
 const AboutUs = () => {
   const [content, setContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -16,11 +17,15 @@ const AboutUs = () => {
 
   const fetchAboutUs = async () => {
     try {
-      const response = await axios.get('/api/system/about');
+      console.log('Fetching About Us content...');
+      const response = await api.get('/system/about');
+      console.log('About Us response:', response.data);
       setContent(response.data.data.content);
       setIsLoading(false);
+      setError(null);
     } catch (error) {
       console.error('Error fetching About Us content:', error);
+      setError('Failed to load About Us content. Please try again.');
       toast.error('Failed to load About Us content');
       setIsLoading(false);
     }
@@ -28,7 +33,7 @@ const AboutUs = () => {
 
   const handleSave = async () => {
     try {
-      await axios.put('/api/system/about', { content });
+      await api.put('/system/about', { content });
       setIsEditing(false);
       toast.success('About Us content updated successfully');
     } catch (error) {
@@ -55,7 +60,19 @@ const AboutUs = () => {
         )}
       </div>
 
-      {isEditing ? (
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+          <button 
+            onClick={fetchAboutUs} 
+            className="ml-2 underline"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {!error && isEditing ? (
         <div className="space-y-4">
           <Editor
             apiKey={process.env.REACT_APP_TINYMCE_API_KEY}
@@ -83,10 +100,12 @@ const AboutUs = () => {
           </button>
         </div>
       ) : (
-        <div 
-          className="prose max-w-none"
-          dangerouslySetInnerHTML={{ __html: content }}
-        />
+        !error && (
+          <div 
+            className="prose max-w-none"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        )
       )}
     </div>
   );

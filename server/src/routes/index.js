@@ -7,6 +7,8 @@ const router = express.Router();
 const routeFiles = fs.readdirSync(__dirname)
   .filter(file => file !== 'index.js' && file.endsWith('Routes.js'));
 
+console.log('Available route files:', routeFiles);
+
 // Register routes
 routeFiles.forEach(file => {
   try {
@@ -42,10 +44,13 @@ routeFiles.forEach(file => {
     }
     
     router.use(apiPath, route);
-    console.log(`Registered route: ${apiPath}`);
+    console.log(`Registered route: ${apiPath} from file ${file}`);
   } catch (error) {
     console.error(`Error loading route file ${file}:`, error);
   }
 });
+
+// Log all registered routes for debugging
+console.log('Router stack length:', router.stack.length);
 
 module.exports = router; 

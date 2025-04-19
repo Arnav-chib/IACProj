@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
+import apiService, { api } from '../../services/api';
 
 const BlogList = () => {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -15,11 +16,15 @@ const BlogList = () => {
 
   const fetchBlogPosts = async () => {
     try {
-      const response = await axios.get('/api/system/blog');
-      setPosts(response.data.data);
+      console.log('Fetching blog posts...');
+      const response = await api.get('/system/blog');
+      console.log('Blog posts response:', response.data);
+      setPosts(response.data.data || []);
       setIsLoading(false);
+      setError(null);
     } catch (error) {
       console.error('Error fetching blog posts:', error);
+      setError('Failed to load blog posts. Please try again.');
       toast.error('Failed to load blog posts');
       setIsLoading(false);
     }
@@ -28,7 +33,7 @@ const BlogList = () => {
   const handleDelete = async (contentId) => {
     if (window.confirm('Are you sure you want to delete this blog post?')) {
       try {
-        await axios.delete(`/api/system/blog/${contentId}`);
+        await api.delete(`/system/blog/${contentId}`);
         toast.success('Blog post deleted successfully');
         fetchBlogPosts();
       } catch (error) {
@@ -61,7 +66,19 @@ const BlogList = () => {
         )}
       </div>
 
-      {posts.length === 0 ? (
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
+          <button 
+            onClick={fetchBlogPosts} 
+            className="ml-2 underline"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
+
+      {!error && posts.length === 0 ? (
         <p className="text-center text-gray-600 my-12">No blog posts found</p>
       ) : (
         <div className="space-y-8">

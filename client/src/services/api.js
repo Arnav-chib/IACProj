@@ -10,6 +10,9 @@ const api = axios.create({
   }
 });
 
+// Add debugging to see what URL is being used
+console.log('API Base URL:', api.defaults.baseURL);
+
 // Request interceptor for adding auth token
 api.interceptors.request.use(
   (config) => {
@@ -17,6 +20,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    console.log(`Making ${config.method.toUpperCase()} request to: ${config.baseURL}${config.url}`);
     return config;
   },
   (error) => {
@@ -30,6 +34,12 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    console.error('API Error:', error.message);
+    if (error.response) {
+      console.error('Status:', error.response.status);
+      console.error('Data:', error.response.data);
+    }
+    
     // Handle unauthorized errors (token expired)
     if (error.response && error.response.status === 401) {
       // Clear token if it's expired
