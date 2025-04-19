@@ -1,5 +1,5 @@
 const { getFormSchema, getUserForms, isFormOwner } = require('../services/formService');
-const { sendError } = require('../utils/responseUtils');
+const { sendError } = require('../utils/controllerUtils');
 
 // Get form by ID
 async function getForm(req, res) {

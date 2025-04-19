@@ -28,7 +28,11 @@ const getAboutUsContent = asyncHandler(async (req, res) => {
  */
 const updateAboutUsContent = asyncHandler(async (req, res) => {
   const { content } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.id || req.user.UserID || req.user.userId;
+  
+  if (!userId) {
+    return sendError(res, 400, 'User ID not found');
+  }
   
   const contentId = await updateAboutUs(userId, content);
   
@@ -79,7 +83,11 @@ const getBlogPostById = asyncHandler(async (req, res) => {
  */
 const createNewBlogPost = asyncHandler(async (req, res) => {
   const { title, content, slug } = req.body;
-  const userId = req.user.id;
+  const userId = req.user.id || req.user.UserID || req.user.userId;
+  
+  if (!userId) {
+    return sendError(res, 400, 'User ID not found');
+  }
   
   const contentId = await createBlogPost(userId, title, content, slug);
   
